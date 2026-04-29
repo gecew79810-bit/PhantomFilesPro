@@ -24,10 +24,12 @@ class RecycleBinRepository @Inject constructor(
     suspend fun moveToRecycleBin(filePath: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val sourceFile = File(filePath)
-            val recycledName = "${System.currentTimeMillis()}_${sourceFile.name}"
+            val wasDirectory = sourceFile.isDirectory
+            val fileName = sourceFile.name
+            val recycledName = "${System.currentTimeMillis()}_$fileName"
             val destFile = File(recycleBinDir, recycledName)
 
-            if (sourceFile.isDirectory) {
+            if (wasDirectory) {
                 sourceFile.copyRecursively(destFile, overwrite = true)
                 sourceFile.deleteRecursively()
             } else {
@@ -39,10 +41,10 @@ class RecycleBinRepository @Inject constructor(
                 RecycleBinItem(
                     originalPath = filePath,
                     recyclePath = destFile.absolutePath,
-                    fileName = sourceFile.name,
-                    fileSize = destFile.length(),
-                    mimeType = java.net.URLConnection.guessContentTypeFromName(sourceFile.name),
-                    isDirectory = sourceFile.isDirectory
+                    fileName = fileName,
+                    fileSize = if (wasDirectory) destFile.walkTopDown().filter { !it.isDirectory }.sumOf { it.length() } else destFile.length(),
+                    mimeType = java.net.URLConnection.guessContentTypeFromName(fileName),
+                    isDirectory = wasDirectory
                 )
             )
             Unit
@@ -83,6 +85,11 @@ class RecycleBinRepository @Inject constructor(
 
     suspend fun autoClean(maxAgeDays: Int = 30) = withContext(Dispatchers.IO) {
         val cutoff = System.currentTimeMillis() - (maxAgeDays * 24 * 60 * 60 * 1000L)
+        val expiredItems = recycleBinDao.getItemsOlderThan(cutoff)
+        expiredItems.forEach { item ->
+            val file = File(item.recyclePath)
+            if (file.isDirectory) file.deleteRecursively() else file.delete()
+        }
         recycleBinDao.deleteOlderThan(cutoff)
     }
 

@@ -32,16 +32,21 @@ class VaultViewModel @Inject constructor(
 
     fun unlock(pin: String) {
         viewModelScope.launch {
-            val savedPin = settingsRepository.vaultPin.first()
-            if (savedPin.isEmpty()) {
+            val savedHash = settingsRepository.vaultPinHash.first()
+            if (savedHash.isEmpty()) {
                 settingsRepository.setVaultPin(pin)
                 vaultPassword = pin
                 loadFiles()
-            } else if (savedPin == pin) {
-                vaultPassword = pin
-                loadFiles()
             } else {
-                _uiState.value = VaultUiState.Error("Wrong PIN")
+                val saltHex = settingsRepository.vaultPinSalt.first()
+                val salt = saltHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                val inputHash = SettingsRepository.hashPin(pin, salt)
+                if (inputHash == savedHash) {
+                    vaultPassword = pin
+                    loadFiles()
+                } else {
+                    _uiState.value = VaultUiState.Error("Wrong PIN")
+                }
             }
         }
     }

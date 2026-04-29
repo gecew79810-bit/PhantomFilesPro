@@ -72,6 +72,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -100,8 +101,15 @@ import java.io.File
 fun FilesScreen(
     viewModel: FilesViewModel = hiltViewModel(),
     onOpenViewer: (FileItem) -> Unit = {},
-    onExitScreen: (() -> Unit)? = null
+    onExitScreen: (() -> Unit)? = null,
+    initialPath: String? = null,
+    initialName: String? = null
 ) {
+    LaunchedEffect(initialPath, initialName) {
+        if (initialPath != null && initialName != null) {
+            viewModel.initializeAtPath(initialPath, initialName)
+        }
+    }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pathStack by viewModel.pathStack.collectAsStateWithLifecycle()
     val selectedFiles by viewModel.selectedFiles.collectAsStateWithLifecycle()
