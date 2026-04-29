@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.phantomfiles.pro.app-mergeDebugResources-75:/values-watch-v20/values-watch-v20.xml",
+            "map": [
+                {
+                    "source": "/home/ubuntu/.gradle/caches/8.9/transforms/0abe0c03c1ee047fd154e0e5c5497771/transformed/appcompat-1.6.1/res/values-watch-v20/values-watch-v20.xml",
+                    "from": {
+                        "startLines": "2,5,8",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,214,385",
+                        "endLines": "4,7,10",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "209,380,553"
+                    }
+                }
+            ]
+        }
+    ]
+}
