@@ -33,7 +33,7 @@ class AICommandUseCase @Inject constructor(
     private val deletePatterns = listOf("delete", "remove", "hata", "saaf", "clean", "clear", "mita", "erase", "karo saaf")
     private val largePatterns = listOf("large", "big", "badi", "bada", "heavy", "huge", "bharee", "size", "space le rahi")
     private val duplicatePatterns = listOf("duplicate", "copy", "dohri", "same", "naqal", "double", "similar", "repeated")
-    private val screenshotPatterns = listOf("screenshot", "screen shot", "ss", "screen capture")
+    private val screenshotPatterns = listOf("screenshot", "screen shot", "screen capture")
     private val oldPatterns = listOf("old", "purani", "purane", "pahle", "earlier", "before")
     private val whatsappPatterns = listOf("whatsapp", "wa", "watsapp", "watsap")
     private val videoPatterns = listOf("video", "vid", "movie", "film", "recording")
