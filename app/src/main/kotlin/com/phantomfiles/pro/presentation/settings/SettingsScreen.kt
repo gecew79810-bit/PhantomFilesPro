@@ -58,6 +58,8 @@ import com.phantomfiles.pro.presentation.theme.PhantomTheme
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showApiKeyDialog by remember { mutableStateOf(false) }
+    var showRecycleDaysDialog by remember { mutableStateOf(false) }
+    var showFtpPasswordDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -118,7 +120,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 icon = Icons.Default.AutoDelete,
                 title = "Auto Empty",
                 subtitle = "After ${state.recycleBinDays} days",
-                iconTint = AmberWarning
+                iconTint = AmberWarning,
+                onClick = { showRecycleDaysDialog = true }
             )
         }
 
@@ -130,6 +133,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 subtitle = "Clean app cache weekly",
                 checked = state.autoCleanCache,
                 onCheckedChange = { viewModel.setAutoCleanCache(it) }
+            )
+        }
+
+        item { SectionHeader("Network") }
+        item {
+            SettingsCard(
+                icon = Icons.Default.Key,
+                title = "FTP Password",
+                subtitle = if (state.ftpPassword.isNotEmpty()) "Password set" else "No password (open access)",
+                iconTint = if (state.ftpPassword.isNotEmpty()) NeonGreen else AmberWarning,
+                onClick = { showFtpPasswordDialog = true }
             )
         }
 
@@ -161,6 +175,61 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 iconTint = ElectricCyan
             )
         }
+    }
+
+    if (showRecycleDaysDialog) {
+        var days by remember { mutableStateOf(state.recycleBinDays.toString()) }
+        AlertDialog(
+            onDismissRequest = { showRecycleDaysDialog = false },
+            title = { Text("Recycle Bin Auto-Empty") },
+            text = {
+                Column {
+                    Text("Files in recycle bin will be auto-deleted after this many days", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = days,
+                        onValueChange = { days = it.filter { c -> c.isDigit() } },
+                        placeholder = { Text("30") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val d = days.toIntOrNull() ?: 30
+                    viewModel.setRecycleBinDays(d.coerceIn(1, 365))
+                    showRecycleDaysDialog = false
+                }) { Text("Save", color = ElectricCyan) }
+            },
+            dismissButton = { TextButton(onClick = { showRecycleDaysDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showFtpPasswordDialog) {
+        var password by remember { mutableStateOf(state.ftpPassword) }
+        AlertDialog(
+            onDismissRequest = { showFtpPasswordDialog = false },
+            title = { Text("FTP Server Password") },
+            text = {
+                Column {
+                    Text("Set password for FTP file transfers. Leave blank for open access.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        placeholder = { Text("Enter password") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.setFtpPassword(password)
+                    showFtpPasswordDialog = false
+                }) { Text("Save", color = ElectricCyan) }
+            },
+            dismissButton = { TextButton(onClick = { showFtpPasswordDialog = false }) { Text("Cancel") } }
+        )
     }
 
     if (showApiKeyDialog) {

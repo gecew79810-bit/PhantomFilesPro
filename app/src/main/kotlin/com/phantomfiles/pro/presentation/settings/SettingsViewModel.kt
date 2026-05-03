@@ -23,7 +23,8 @@ data class SettingsState(
     val ftpPort: Int = 2121,
     val shizukuAvailable: Boolean = false,
     val shizukuConnected: Boolean = false,
-    val isRooted: Boolean = false
+    val isRooted: Boolean = false,
+    val ftpPassword: String = ""
 )
 
 @HiltViewModel
@@ -56,6 +57,14 @@ class SettingsViewModel @Inject constructor(
                 )
             }.collect { _state.value = it }
         }
+        viewModelScope.launch {
+            combine(
+                settingsRepository.ftpPassword,
+                settingsRepository.autoCleanCache
+            ) { ftpPwd, autoClean ->
+                _state.value.copy(ftpPassword = ftpPwd, autoCleanCache = autoClean)
+            }.collect { _state.value = it }
+        }
     }
 
     fun setShowHiddenFiles(show: Boolean) { viewModelScope.launch { settingsRepository.setShowHiddenFiles(show) } }
@@ -64,6 +73,8 @@ class SettingsViewModel @Inject constructor(
     fun setRecycleBinDays(days: Int) { viewModelScope.launch { settingsRepository.setRecycleBinDays(days) } }
     fun setGroqApiKey(key: String) { viewModelScope.launch { settingsRepository.setGroqApiKey(key) } }
     fun setAutoCleanCache(enabled: Boolean) { viewModelScope.launch { settingsRepository.setAutoCleanCache(enabled) } }
+
+    fun setFtpPassword(password: String) { viewModelScope.launch { settingsRepository.setFtpPassword(password) } }
 
     fun requestShizukuPermission() { shizukuRepository.requestPermission() }
 }

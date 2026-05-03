@@ -17,7 +17,10 @@ val DangerRed = Color(0xFFFF1744)
 val TextPrimary = Color(0xFFE0E0E0)
 val TextSecondary = Color(0xFF9E9E9E)
 val CardBackground = Color(0xFF121218)
+val CardGlass = Color(0xFF0E0E14)
 val DividerColor = Color(0xFF2A2A3E)
+val CyanGlow = Color(0x1A00E5FF)
+val PurpleGlow = Color(0x1A7C4DFF)
 
 private val PhantomColorScheme = darkColorScheme(
     primary = ElectricCyan,

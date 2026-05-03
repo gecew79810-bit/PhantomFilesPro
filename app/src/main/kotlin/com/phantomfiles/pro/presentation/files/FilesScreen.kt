@@ -1,6 +1,7 @@
 package com.phantomfiles.pro.presentation.files
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -36,13 +37,16 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
@@ -93,8 +97,17 @@ import com.phantomfiles.pro.presentation.theme.ElectricCyan
 import com.phantomfiles.pro.presentation.theme.NeonGreen
 import com.phantomfiles.pro.presentation.theme.PhantomPurple
 import com.phantomfiles.pro.presentation.theme.PhantomTheme
+import com.phantomfiles.pro.presentation.components.ShimmerFileListItem
 import com.phantomfiles.pro.util.FormatUtils
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.aspectRatio
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,6 +137,8 @@ fun FilesScreen(
     var showRenameDialog by remember { mutableStateOf<FileItem?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var showPropertiesFile by remember { mutableStateOf<FileItem?>(null) }
+    val context = LocalContext.current
 
     BackHandler(enabled = pathStack.size > 1 || onExitScreen != null) {
         if (!viewModel.navigateBack()) {
@@ -226,6 +241,7 @@ fun FilesScreen(
                     onCut = { viewModel.cutSelected() },
                     onDelete = { showDeleteConfirm = true },
                     onPaste = { viewModel.paste() },
+                    onCompress = { viewModel.compressSelected() },
                     onClear = { viewModel.clearSelection() }
                 )
             }
@@ -267,8 +283,8 @@ fun FilesScreen(
 
             when (val state = uiState) {
                 is FilesUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = ElectricCyan)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        repeat(10) { ShimmerFileListItem() }
                     }
                 }
                 is FilesUiState.Error -> {
@@ -317,7 +333,9 @@ fun FilesScreen(
                                     },
                                     onLongClick = { viewModel.toggleFileSelection(file.path) },
                                     onRename = { showRenameDialog = file },
-                                    onShare = { shareFile(file) }
+                                    onShare = { shareFileReal(context, file) },
+                                    onProperties = { showPropertiesFile = file },
+                                    onExtract = if (file.fileType == FileType.ARCHIVE) { { viewModel.extractZip(file.path) } } else null
                                 )
                             }
                         }
@@ -356,6 +374,13 @@ fun FilesScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
             }
+        )
+    }
+
+    showPropertiesFile?.let { file ->
+        FilePropertiesDialog(
+            file = file,
+            onDismiss = { showPropertiesFile = null }
         )
     }
 
@@ -402,7 +427,9 @@ private fun FileListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onRename: () -> Unit = {},
-    onShare: () -> Unit = {}
+    onShare: () -> Unit = {},
+    onProperties: () -> Unit = {},
+    onExtract: (() -> Unit)? = null
 ) {
     val iconColor = when (file.fileType) {
         FileType.FOLDER -> ElectricCyan
@@ -430,12 +457,21 @@ private fun FileListItem(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
-                contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(36.dp)
-            )
+            if (file.fileType == FileType.IMAGE) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(File(file.path)).size(72).crossfade(true).build(),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -473,6 +509,18 @@ private fun FileListItem(
                             onClick = { showItemMenu = false; onShare() }
                         )
                     }
+                    onExtract?.let { extract ->
+                        DropdownMenuItem(
+                            text = { Text("Extract") },
+                            leadingIcon = { Icon(Icons.Default.FolderZip, null) },
+                            onClick = { showItemMenu = false; extract() }
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Properties") },
+                        leadingIcon = { Icon(Icons.Default.Info, null) },
+                        onClick = { showItemMenu = false; onProperties() }
+                    )
                 }
             }
         }
@@ -539,6 +587,7 @@ private fun BatchActionBar(
     onCut: () -> Unit,
     onDelete: () -> Unit,
     onPaste: () -> Unit,
+    onCompress: () -> Unit = {},
     onClear: () -> Unit
 ) {
     Card(
@@ -555,6 +604,7 @@ private fun BatchActionBar(
             IconButton(onClick = onCopy) { Icon(Icons.Default.ContentCopy, "Copy", tint = ElectricCyan) }
             IconButton(onClick = onCut) { Icon(Icons.Default.ContentCut, "Cut", tint = AmberWarning) }
             IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Delete", tint = DangerRed) }
+            IconButton(onClick = onCompress) { Icon(Icons.Default.Compress, "Compress", tint = PhantomPurple) }
             if (hasClipboard) {
                 IconButton(onClick = onPaste) { Icon(Icons.Default.ContentPaste, "Paste", tint = NeonGreen) }
             }
@@ -639,7 +689,92 @@ private fun SortDialog(currentSort: String, onDismiss: () -> Unit, onSelect: (St
     )
 }
 
-private fun shareFile(file: FileItem) { /* handled via context in real usage */ }
+private fun shareFileReal(context: android.content.Context, file: FileItem) {
+    try {
+        val javaFile = File(file.path)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", javaFile)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = file.mimeType ?: "*/*"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share ${file.name}"))
+    } catch (_: Exception) { }
+}
+
+@Composable
+private fun FilePropertiesDialog(file: FileItem, onDismiss: () -> Unit) {
+    var properties by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(file) {
+        isLoading = true
+        properties = withContext(Dispatchers.IO) {
+            val jFile = File(file.path)
+            val props = linkedMapOf<String, String>()
+            props["Name"] = jFile.name
+            props["Path"] = jFile.absolutePath
+            props["Type"] = if (jFile.isDirectory) "Folder" else file.extension.uppercase().ifEmpty { "Unknown" }
+            props["Size"] = FormatUtils.formatSize(
+                if (jFile.isDirectory) jFile.walkTopDown().filter { !it.isDirectory }.sumOf { it.length() }
+                else jFile.length()
+            )
+            props["Modified"] = FormatUtils.formatDate(jFile.lastModified())
+            try {
+                val attrs = Files.readAttributes(jFile.toPath(), BasicFileAttributes::class.java)
+                props["Created"] = FormatUtils.formatDate(attrs.creationTime().toMillis())
+            } catch (_: Exception) { }
+            props["Readable"] = if (jFile.canRead()) "Yes" else "No"
+            props["Writable"] = if (jFile.canWrite()) "Yes" else "No"
+            props["Hidden"] = if (jFile.isHidden) "Yes" else "No"
+            if (jFile.isDirectory) {
+                val count = jFile.listFiles()?.size ?: 0
+                props["Items"] = "$count"
+            }
+            if (!jFile.isDirectory) {
+                try {
+                    val hash = com.phantomfiles.pro.util.FileHashUtil.md5(jFile)
+                    if (hash != null) props["MD5"] = hash
+                } catch (_: Exception) { }
+            }
+            props
+        }
+        isLoading = false
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Properties", color = ElectricCyan) },
+        text = {
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = ElectricCyan, modifier = Modifier.size(32.dp))
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    properties.forEach { (key, value) ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                "$key:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(80.dp)
+                            )
+                            Text(
+                                value,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close", color = ElectricCyan) }
+        }
+    )
+}
 
 @Preview(showBackground = true, backgroundColor = 0xFF050505)
 @Composable
