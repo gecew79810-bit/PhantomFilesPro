@@ -30,6 +30,7 @@ class SettingsRepository @Inject constructor(
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         val VAULT_PIN_HASH = stringPreferencesKey("vault_pin_hash")
         val VAULT_PIN_SALT = stringPreferencesKey("vault_pin_salt")
+        val VAULT_PIN_LEGACY = stringPreferencesKey("vault_pin")
         private const val PIN_ITERATIONS = 10000
         private const val PIN_KEY_LENGTH = 256
 
@@ -52,6 +53,7 @@ class SettingsRepository @Inject constructor(
     val biometricEnabled: Flow<Boolean> = context.dataStore.data.map { it[BIOMETRIC_ENABLED] ?: false }
     val vaultPinHash: Flow<String> = context.dataStore.data.map { it[VAULT_PIN_HASH] ?: "" }
     val vaultPinSalt: Flow<String> = context.dataStore.data.map { it[VAULT_PIN_SALT] ?: "" }
+    val vaultPinLegacy: Flow<String> = context.dataStore.data.map { it[VAULT_PIN_LEGACY] ?: "" }
     val recycleBinDays: Flow<Int> = context.dataStore.data.map { it[RECYCLE_BIN_DAYS] ?: 30 }
     val recycleBinSizeMb: Flow<Int> = context.dataStore.data.map { it[RECYCLE_BIN_SIZE_MB] ?: 500 }
     val autoCleanCache: Flow<Boolean> = context.dataStore.data.map { it[AUTO_CLEAN_CACHE] ?: false }
@@ -70,6 +72,7 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit {
             it[VAULT_PIN_HASH] = hash
             it[VAULT_PIN_SALT] = saltHex
+            it.remove(VAULT_PIN_LEGACY)
         }
     }
     suspend fun setRecycleBinDays(days: Int) = context.dataStore.edit { it[RECYCLE_BIN_DAYS] = days }
