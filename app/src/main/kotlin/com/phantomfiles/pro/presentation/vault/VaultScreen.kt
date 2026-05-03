@@ -1,5 +1,7 @@
 package com.phantomfiles.pro.presentation.vault
 
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -33,12 +36,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,14 +51,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.phantomfiles.pro.presentation.theme.DangerRed
 import com.phantomfiles.pro.presentation.theme.ElectricCyan
+import com.phantomfiles.pro.presentation.theme.NeonGreen
 import com.phantomfiles.pro.presentation.theme.PhantomPurple
 import com.phantomfiles.pro.presentation.theme.PhantomTheme
 import com.phantomfiles.pro.util.FormatUtils
@@ -87,14 +96,23 @@ fun VaultScreen(
         }
     ) { padding ->
         when (val state = uiState) {
-            is VaultUiState.Locked -> LockScreen(modifier = Modifier.padding(padding)) { pin -> viewModel.unlock(pin) }
+            is VaultUiState.Locked -> LockScreen(
+                modifier = Modifier.padding(padding),
+                onUnlock = { pin -> viewModel.unlock(pin) },
+                onBiometricSuccess = { viewModel.unlockViaBiometric() }
+            )
             is VaultUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = ElectricCyan)
                 }
             }
             is VaultUiState.Error -> {
-                LockScreen(modifier = Modifier.padding(padding), error = state.message) { pin -> viewModel.unlock(pin) }
+                LockScreen(
+                    modifier = Modifier.padding(padding),
+                    error = state.message,
+                    onUnlock = { pin -> viewModel.unlock(pin) },
+                    onBiometricSuccess = { viewModel.unlockViaBiometric() }
+                )
             }
             is VaultUiState.Unlocked -> {
                 if (state.files.isEmpty()) {
@@ -153,8 +171,27 @@ fun VaultScreen(
 }
 
 @Composable
-private fun LockScreen(modifier: Modifier = Modifier, error: String = "", onUnlock: (String) -> Unit) {
+private fun LockScreen(
+    modifier: Modifier = Modifier,
+    error: String = "",
+    onUnlock: (String) -> Unit,
+    onBiometricSuccess: () -> Unit
+) {
     var pin by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+
+    val biometricAvailable = remember {
+        val mgr = BiometricManager.from(context)
+        mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    LaunchedEffect(biometricAvailable) {
+        if (biometricAvailable && activity != null) {
+            showBiometricPrompt(activity, onBiometricSuccess)
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -191,8 +228,38 @@ private fun LockScreen(modifier: Modifier = Modifier, error: String = "", onUnlo
             ) {
                 Text("Unlock")
             }
+            if (biometricAvailable) {
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (activity != null) showBiometricPrompt(activity, onBiometricSuccess)
+                    }
+                ) {
+                    Icon(Icons.Default.Fingerprint, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Use Fingerprint", color = NeonGreen)
+                }
+            }
         }
     }
+}
+
+private fun showBiometricPrompt(activity: FragmentActivity, onSuccess: () -> Unit) {
+    val executor = ContextCompat.getMainExecutor(activity)
+    val callback = object : BiometricPrompt.AuthenticationCallback() {
+        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+            onSuccess()
+        }
+    }
+    val prompt = BiometricPrompt(activity, executor, callback)
+    val info = BiometricPrompt.PromptInfo.Builder()
+        .setTitle("PhantomFiles Vault")
+        .setSubtitle("Authenticate to unlock your vault")
+        .setNegativeButtonText("Use PIN instead")
+        .build()
+    try {
+        prompt.authenticate(info)
+    } catch (_: Exception) { }
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF050505)
