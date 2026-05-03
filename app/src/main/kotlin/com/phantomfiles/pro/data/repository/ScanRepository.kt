@@ -25,10 +25,15 @@ class ScanRepository @Inject constructor(
         emit(results)
     }.flowOn(Dispatchers.IO)
 
-    private fun scanForDisguised(dir: File, results: MutableList<DisguisedFile>) {
-        dir.listFiles()?.forEach { file ->
+    private val skipDirs = setOf("Android", ".gradle", "node_modules", ".git", "__pycache__")
+
+    private fun scanForDisguised(dir: File, results: MutableList<DisguisedFile>, depth: Int = 0) {
+        if (depth > 8) return
+        val files = dir.listFiles() ?: return
+        for (file in files) {
             try {
                 if (file.isDirectory) {
+                    if (file.name in skipDirs && depth < 2) continue
                     if (File(file, ".nomedia").exists()) {
                         results.add(
                             DisguisedFile(
@@ -41,8 +46,8 @@ class ScanRepository @Inject constructor(
                             )
                         )
                     }
-                    scanForDisguised(file, results)
-                    return@forEach
+                    scanForDisguised(file, results, depth + 1)
+                    continue
                 }
                 if (file.length() == 0L && !file.name.startsWith(".")) {
                     results.add(
@@ -55,7 +60,7 @@ class ScanRepository @Inject constructor(
                             reason = "0 KB file"
                         )
                     )
-                    return@forEach
+                    continue
                 }
                 if (file.name.count { it == '.' } > 1) {
                     results.add(
@@ -122,14 +127,16 @@ class ScanRepository @Inject constructor(
 
     fun findJunkFiles(basePath: String): Flow<List<FileItem>> = flow {
         val junk = mutableListOf<FileItem>()
-        fun scan(dir: File) {
-            dir.listFiles()?.forEach { file ->
+        fun scan(dir: File, depth: Int = 0) {
+            if (depth > 6) return
+            val files = dir.listFiles() ?: return
+            for (file in files) {
                 try {
                     if (file.isDirectory) {
                         if (file.name in listOf(".thumbnails", "cache", "Cache", "tmp", "temp")) {
-                            file.walkTopDown().filter { !it.isDirectory }.forEach { junk.add(it.toFileItem()) }
+                            file.walkTopDown().maxDepth(3).filter { !it.isDirectory }.take(500).forEach { junk.add(it.toFileItem()) }
                         } else {
-                            scan(file)
+                            scan(file, depth + 1)
                         }
                     } else if (file.extension.lowercase() in listOf("tmp", "temp", "log", "bak")) {
                         junk.add(file.toFileItem())

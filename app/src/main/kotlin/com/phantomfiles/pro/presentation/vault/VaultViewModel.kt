@@ -90,6 +90,13 @@ class VaultViewModel @Inject constructor(
         }
     }
 
+    fun unlockViaBiometric() {
+        viewModelScope.launch {
+            vaultPassword = "biometric_unlock"
+            loadFiles()
+        }
+    }
+
     fun lock() {
         vaultPassword = ""
         _uiState.value = VaultUiState.Locked

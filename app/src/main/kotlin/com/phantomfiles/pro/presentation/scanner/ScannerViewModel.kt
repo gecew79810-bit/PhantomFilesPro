@@ -12,11 +12,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 data class ScannerState(
     val isScanning: Boolean = false,
     val scanType: String = "",
+    val scanProgress: Int = 0,
+    val scanStatus: String = "",
     val largeFiles: List<FileItem> = emptyList(),
     val duplicates: List<DuplicateGroup> = emptyList(),
     val disguisedFiles: List<DisguisedFile> = emptyList(),
@@ -37,52 +40,93 @@ class ScannerViewModel @Inject constructor(
 
     fun scanLargeFiles(minSize: Long = 100 * 1024 * 1024) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isScanning = true, scanType = "large_files")
+            _state.value = _state.value.copy(isScanning = true, scanType = "large files", scanProgress = 0, scanStatus = "Starting scan...")
+            _state.value = _state.value.copy(scanProgress = 10, scanStatus = "Scanning storage...")
             val files = fileRepository.getLargeFiles(fileRepository.getRootPath(), minSize).first()
-            _state.value = _state.value.copy(isScanning = false, largeFiles = files)
+            _state.value = _state.value.copy(scanProgress = 90, scanStatus = "Found ${files.size} files")
+            _state.value = _state.value.copy(isScanning = false, largeFiles = files, scanProgress = 100, scanStatus = "Complete")
             scanRepository.saveScanResult("large_files", files.size, files.sumOf { it.size })
         }
     }
 
     fun scanDuplicates() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isScanning = true, scanType = "duplicates")
+            _state.value = _state.value.copy(isScanning = true, scanType = "duplicates", scanProgress = 0, scanStatus = "Starting scan...")
+            _state.value = _state.value.copy(scanProgress = 10, scanStatus = "Computing file hashes...")
             val dupes = scanRepository.findDuplicates(fileRepository.getRootPath()).first()
-            _state.value = _state.value.copy(isScanning = false, duplicates = dupes)
+            _state.value = _state.value.copy(scanProgress = 90, scanStatus = "Found ${dupes.size} groups")
+            _state.value = _state.value.copy(isScanning = false, duplicates = dupes, scanProgress = 100, scanStatus = "Complete")
             scanRepository.saveScanResult("duplicates", dupes.size, dupes.sumOf { it.totalWastedSize })
         }
     }
 
     fun scanDisguised() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isScanning = true, scanType = "disguised")
+            _state.value = _state.value.copy(isScanning = true, scanType = "disguised", scanProgress = 0, scanStatus = "Starting scan...")
+            _state.value = _state.value.copy(scanProgress = 10, scanStatus = "Checking magic bytes...")
             val files = scanRepository.scanDisguisedFiles(fileRepository.getRootPath()).first()
-            _state.value = _state.value.copy(isScanning = false, disguisedFiles = files)
+            _state.value = _state.value.copy(scanProgress = 90, scanStatus = "Found ${files.size} disguised files")
+            _state.value = _state.value.copy(isScanning = false, disguisedFiles = files, scanProgress = 100, scanStatus = "Complete")
             scanRepository.saveScanResult("disguised", files.size, files.sumOf { it.size })
         }
     }
 
     fun scanJunk() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isScanning = true, scanType = "junk")
+            _state.value = _state.value.copy(isScanning = true, scanType = "junk", scanProgress = 0, scanStatus = "Starting scan...")
+            _state.value = _state.value.copy(scanProgress = 20, scanStatus = "Finding cache files...")
             val junk = scanRepository.findJunkFiles(fileRepository.getRootPath()).first()
+            _state.value = _state.value.copy(scanProgress = 50, scanStatus = "Finding empty folders...")
             val empty = scanRepository.findEmptyFolders(fileRepository.getRootPath()).first()
+            _state.value = _state.value.copy(scanProgress = 75, scanStatus = "Finding old APKs...")
             val apks = scanRepository.findOldApks(fileRepository.getRootPath()).first()
             val totalJunk = junk.sumOf { it.size }
+            _state.value = _state.value.copy(scanProgress = 90, scanStatus = "Found ${junk.size + empty.size + apks.size} items")
             _state.value = _state.value.copy(
                 isScanning = false,
                 junkFiles = junk,
                 emptyFolders = empty,
                 oldApks = apks,
-                totalJunkSize = totalJunk
+                totalJunkSize = totalJunk,
+                scanProgress = 100,
+                scanStatus = "Complete"
             )
             scanRepository.saveScanResult("junk", junk.size + empty.size + apks.size, totalJunk)
         }
     }
 
+    fun deleteFile(path: String) {
+        viewModelScope.launch {
+            try {
+                val file = File(path)
+                if (file.exists()) {
+                    if (file.isDirectory) file.deleteRecursively() else file.delete()
+                }
+                _state.value = _state.value.copy(
+                    junkFiles = _state.value.junkFiles.filter { it.path != path },
+                    largeFiles = _state.value.largeFiles.filter { it.path != path },
+                    disguisedFiles = _state.value.disguisedFiles.filter { it.path != path },
+                    totalJunkSize = _state.value.junkFiles.filter { it.path != path }.sumOf { it.size }
+                )
+            } catch (_: Exception) { }
+        }
+    }
+
     fun deleteFiles(paths: List<String>) {
         viewModelScope.launch {
-            paths.forEach { fileRepository.deleteFile(it) }
+            paths.forEach { path ->
+                try {
+                    val file = File(path)
+                    if (file.exists()) {
+                        if (file.isDirectory) file.deleteRecursively() else file.delete()
+                    }
+                } catch (_: Exception) { }
+            }
+            _state.value = _state.value.copy(
+                junkFiles = _state.value.junkFiles.filter { it.path !in paths },
+                largeFiles = _state.value.largeFiles.filter { it.path !in paths },
+                totalJunkSize = _state.value.junkFiles.filter { it.path !in paths }.sumOf { it.size }
+            )
         }
     }
 }
