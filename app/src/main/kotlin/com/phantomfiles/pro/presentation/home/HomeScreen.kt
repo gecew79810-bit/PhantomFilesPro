@@ -3,6 +3,7 @@ package com.phantomfiles.pro.presentation.home
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +70,7 @@ import com.phantomfiles.pro.presentation.theme.NeonGreen
 import com.phantomfiles.pro.presentation.theme.PhantomPurple
 import com.phantomfiles.pro.presentation.theme.PhantomTheme
 import com.phantomfiles.pro.presentation.theme.DangerRed
+import com.phantomfiles.pro.presentation.theme.CardGlass
 import com.phantomfiles.pro.presentation.theme.AmberWarning
 import com.phantomfiles.pro.presentation.components.ShimmerStorageCard
 import com.phantomfiles.pro.presentation.components.ShimmerFileListItem
@@ -322,8 +324,9 @@ private fun StorageCard(state: HomeState) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp)
+        colors = CardDefaults.cardColors(containerColor = CardGlass),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Brush.linearGradient(listOf(ElectricCyan.copy(alpha = 0.3f), PhantomPurple.copy(alpha = 0.1f))))
     ) {
         Row(
             modifier = Modifier.padding(20.dp),
@@ -393,8 +396,9 @@ private fun QuickAccessCard(name: String, icon: ImageVector, tint: Color = Elect
         modifier = Modifier
             .width(90.dp)
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = CardGlass),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(0.5.dp, tint.copy(alpha = 0.2f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -404,7 +408,7 @@ private fun QuickAccessCard(name: String, icon: ImageVector, tint: Color = Elect
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(tint.copy(alpha = 0.15f)),
+                    .background(tint.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = name, tint = tint, modifier = Modifier.size(20.dp))
