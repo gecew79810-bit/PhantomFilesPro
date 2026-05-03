@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 sealed class FilesUiState {
@@ -255,6 +256,34 @@ class FilesViewModel @Inject constructor(
     fun createFile(name: String) {
         viewModelScope.launch {
             fileRepository.createFile(_currentPath.value, name)
+            loadFiles()
+        }
+    }
+
+    fun compressSelected() {
+        viewModelScope.launch {
+            val paths = _selectedFiles.value.toList()
+            if (paths.isEmpty()) return@launch
+            val firstName = File(paths.first()).name
+            val zipName = if (paths.size == 1) "${firstName}.zip" else "archive_${System.currentTimeMillis()}.zip"
+            val destPath = "${_currentPath.value}/$zipName"
+            _operationProgress.value = "Compressing..." to 0
+            fileRepository.compressToZip(paths, destPath) { progress ->
+                _operationProgress.value = "Compressing..." to progress
+            }
+            _selectedFiles.value = emptySet()
+            _operationProgress.value = null
+            loadFiles()
+        }
+    }
+
+    fun extractZip(path: String) {
+        viewModelScope.launch {
+            _operationProgress.value = "Extracting..." to 0
+            fileRepository.extractZip(path, _currentPath.value) { count ->
+                _operationProgress.value = "Extracting... ($count files)" to 50
+            }
+            _operationProgress.value = null
             loadFiles()
         }
     }

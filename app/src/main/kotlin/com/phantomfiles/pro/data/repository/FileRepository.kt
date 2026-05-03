@@ -209,6 +209,61 @@ class FileRepository @Inject constructor() {
         props
     }
 
+    suspend fun compressToZip(paths: List<String>, destPath: String, onProgress: (Int) -> Unit = {}): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val zipFile = File(destPath)
+                java.util.zip.ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+                    val allFiles = paths.flatMap { path ->
+                        val f = File(path)
+                        if (f.isDirectory) f.walkTopDown().filter { !it.isDirectory }.map { it to it.relativeTo(f.parentFile ?: f) }.toList()
+                        else listOf(f to f)
+                    }
+                    allFiles.forEachIndexed { index, (file, relative) ->
+                        val entryName = if (file == relative) file.name else relative.path
+                        zos.putNextEntry(java.util.zip.ZipEntry(entryName))
+                        FileInputStream(file).use { fis ->
+                            fis.copyTo(zos, 8192)
+                        }
+                        zos.closeEntry()
+                        onProgress(((index + 1) * 100) / allFiles.size)
+                    }
+                }
+                zipFile.absolutePath
+            }
+        }
+
+    suspend fun extractZip(zipPath: String, destDir: String, onProgress: (Int) -> Unit = {}): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val destFolder = File(destDir, File(zipPath).nameWithoutExtension)
+                destFolder.mkdirs()
+                java.util.zip.ZipInputStream(FileInputStream(File(zipPath))).use { zis ->
+                    var entry = zis.nextEntry
+                    var count = 0
+                    while (entry != null) {
+                        val outFile = File(destFolder, entry.name)
+                        if (!outFile.canonicalPath.startsWith(destFolder.canonicalPath)) {
+                            throw SecurityException("Zip path traversal detected")
+                        }
+                        if (entry.isDirectory) {
+                            outFile.mkdirs()
+                        } else {
+                            outFile.parentFile?.mkdirs()
+                            FileOutputStream(outFile).use { fos ->
+                                zis.copyTo(fos, 8192)
+                            }
+                        }
+                        count++
+                        onProgress(count)
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+                }
+                destFolder.absolutePath
+            }
+        }
+
     private fun File.toFileItem(): FileItem = FileItem(
         path = absolutePath,
         name = name,

@@ -204,27 +204,51 @@ private fun ScanAnimation(scanType: String) {
         animationSpec = infiniteRepeatable(animation = tween(2000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
         label = "rotation"
     )
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(animation = tween(1000), repeatMode = RepeatMode.Reverse),
+        label = "pulse"
+    )
 
-    Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.size(80.dp).rotate(rotation)) {
+    Box(modifier = Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(100.dp)) {
+            val center = this.center
+            val radius = size.minDimension / 2
+            drawCircle(color = ElectricCyan.copy(alpha = 0.05f), radius = radius)
+            drawCircle(color = ElectricCyan.copy(alpha = 0.1f), radius = radius * 0.7f)
+            drawCircle(color = ElectricCyan.copy(alpha = 0.15f), radius = radius * 0.4f)
             drawArc(
-                color = ElectricCyan,
-                startAngle = 0f,
-                sweepAngle = 120f,
-                useCenter = false,
-                style = Stroke(width = 4f, cap = StrokeCap.Round)
+                color = ElectricCyan.copy(alpha = 0.3f),
+                startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                style = Stroke(width = 1.5f)
             )
             drawArc(
-                color = PhantomPurple,
-                startAngle = 180f,
-                sweepAngle = 90f,
-                useCenter = false,
-                style = Stroke(width = 4f, cap = StrokeCap.Round)
+                color = ElectricCyan.copy(alpha = 0.2f),
+                startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                topLeft = center - androidx.compose.ui.geometry.Offset(radius * 0.7f, radius * 0.7f),
+                size = androidx.compose.ui.geometry.Size(radius * 1.4f, radius * 1.4f),
+                style = Stroke(width = 1f)
+            )
+        }
+        Canvas(modifier = Modifier.size(100.dp).rotate(rotation)) {
+            val radius = size.minDimension / 2
+            drawArc(
+                brush = androidx.compose.ui.graphics.Brush.sweepGradient(
+                    0f to Color.Transparent,
+                    0.3f to ElectricCyan.copy(alpha = pulseAlpha),
+                    0.35f to ElectricCyan.copy(alpha = 0.8f),
+                    0.36f to Color.Transparent,
+                    1f to Color.Transparent
+                ),
+                startAngle = 0f, sweepAngle = 360f, useCenter = true,
+                topLeft = center - androidx.compose.ui.geometry.Offset(radius, radius),
+                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Radar, contentDescription = null, tint = ElectricCyan, modifier = Modifier.size(32.dp))
-            Text("Scanning...", style = MaterialTheme.typography.labelSmall, color = ElectricCyan)
+            Icon(Icons.Default.Radar, contentDescription = null, tint = ElectricCyan, modifier = Modifier.size(28.dp))
+            Text("Scanning $scanType...", style = MaterialTheme.typography.labelSmall, color = ElectricCyan)
         }
     }
 }

@@ -7,6 +7,7 @@ import com.phantomfiles.pro.data.remote.GroqRequest
 import com.phantomfiles.pro.data.repository.FileRepository
 import com.phantomfiles.pro.data.repository.ScanRepository
 import com.phantomfiles.pro.data.repository.SettingsRepository
+import com.phantomfiles.pro.util.FormatUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -28,117 +29,315 @@ class AICommandUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val groqApi: GroqApi
 ) {
+    private val cachePatterns = listOf("cache", "cach", "kesh", "temp file", "temporary")
+    private val deletePatterns = listOf("delete", "remove", "hata", "saaf", "clean", "clear", "mita", "erase", "karo saaf")
+    private val largePatterns = listOf("large", "big", "badi", "bada", "heavy", "huge", "bharee", "size", "space le rahi")
+    private val duplicatePatterns = listOf("duplicate", "copy", "dohri", "same", "naqal", "double", "similar", "repeated")
+    private val screenshotPatterns = listOf("screenshot", "screen shot", "ss", "screen capture")
+    private val oldPatterns = listOf("old", "purani", "purane", "pahle", "earlier", "before")
+    private val whatsappPatterns = listOf("whatsapp", "wa", "watsapp", "watsap")
+    private val videoPatterns = listOf("video", "vid", "movie", "film", "recording")
+    private val imagePatterns = listOf("image", "photo", "pic", "picture", "tasveer", "foto", "gallery")
+    private val audioPatterns = listOf("audio", "music", "song", "gaana", "mp3", "sound")
+    private val documentPatterns = listOf("document", "doc", "pdf", "file", "dastavez")
+    private val downloadPatterns = listOf("download", "downloaded")
+    private val storagePatterns = listOf("storage", "space", "memory", "jagah", "report", "usage", "kitni")
+    private val scanPatterns = listOf("scan", "check", "find hidden", "disguised", "suspicious", "chhupa")
+    private val junkPatterns = listOf("junk", "garbage", "kachra", "waste", "bekar", "useless", "residual", "leftover")
+    private val emptyPatterns = listOf("empty folder", "khali folder", "blank folder")
+    private val apkPatterns = listOf("apk", "app file", "installer")
+    private val recentPatterns = listOf("recent", "latest", "new file", "nayi file", "haal", "last")
+    private val androidDataPatterns = listOf("android/data", "android data", "app data", "private folder")
+    private val helpPatterns = listOf("help", "madad", "kya kar sakt", "what can", "commands", "features")
+
     fun processCommand(command: String): Flow<AIResponse> = flow {
         val cmd = command.lowercase().trim()
-        when {
-            cmd.contains("cache") && (cmd.contains("delete") || cmd.contains("clear") || cmd.contains("hata")) -> {
+        val intent = detectIntent(cmd)
+
+        when (intent) {
+            Intent.CACHE_CLEAN -> {
                 val junkFiles = scanRepository.findJunkFiles(fileRepository.getRootPath()).first()
-                val cacheFiles = junkFiles.filter { it.path.contains("cache", true) }
+                val cacheFiles = junkFiles.filter { it.path.contains("cache", true) || it.path.contains("Cache", false) }
                 emit(AIResponse(
-                    message = "Found ${cacheFiles.size} cache files (${com.phantomfiles.pro.util.FormatUtils.formatSize(cacheFiles.sumOf { it.size })})",
+                    message = "Found ${cacheFiles.size} cache files (${FormatUtils.formatSize(cacheFiles.sumOf { it.size })}). Ready to clean.",
                     action = AIAction.DELETE_FILES,
                     files = cacheFiles
                 ))
             }
-            cmd.contains("whatsapp") && (cmd.contains("video") || cmd.contains("media")) -> {
-                val videos = fileRepository.searchByType(
+            Intent.WHATSAPP_MEDIA -> {
+                val exts = when {
+                    matchesAny(cmd, videoPatterns) -> listOf(".mp4", ".3gp", ".mkv", ".avi")
+                    matchesAny(cmd, imagePatterns) -> listOf(".jpg", ".jpeg", ".png", ".gif", ".webp")
+                    matchesAny(cmd, audioPatterns) -> listOf(".mp3", ".opus", ".m4a", ".aac")
+                    else -> listOf(".mp4", ".3gp", ".jpg", ".jpeg", ".png", ".gif", ".mp3", ".opus")
+                }
+                val mediaType = when {
+                    matchesAny(cmd, videoPatterns) -> "videos"
+                    matchesAny(cmd, imagePatterns) -> "photos"
+                    matchesAny(cmd, audioPatterns) -> "audio files"
+                    else -> "media files"
+                }
+                val basePaths = listOf(
                     "/storage/emulated/0/Android/media/com.whatsapp",
-                    listOf(".mp4", ".3gp", ".mkv")
-                ).first()
+                    "/storage/emulated/0/WhatsApp/Media",
+                    "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media"
+                )
+                val results = mutableListOf<FileItem>()
+                for (path in basePaths) {
+                    try { results.addAll(fileRepository.searchByType(path, exts).first()) } catch (_: Exception) { }
+                }
                 emit(AIResponse(
-                    message = "Found ${videos.size} WhatsApp videos",
+                    message = "Found ${results.size} WhatsApp $mediaType (${FormatUtils.formatSize(results.sumOf { it.size })})",
                     action = AIAction.SHOW_FILES,
-                    files = videos
+                    files = results.sortedByDescending { it.size }
                 ))
             }
-            cmd.contains("badi") || cmd.contains("large") || (cmd.contains("gb") || cmd.contains("mb")) -> {
+            Intent.LARGE_FILES -> {
                 val minSize = extractSize(cmd)
                 val largeFiles = fileRepository.getLargeFiles(fileRepository.getRootPath(), minSize).first()
                 emit(AIResponse(
-                    message = "Found ${largeFiles.size} files larger than ${com.phantomfiles.pro.util.FormatUtils.formatSize(minSize)}",
+                    message = "Found ${largeFiles.size} files larger than ${FormatUtils.formatSize(minSize)} (Total: ${FormatUtils.formatSize(largeFiles.sumOf { it.size })})",
                     action = AIAction.SHOW_FILES,
                     files = largeFiles
                 ))
             }
-            cmd.contains("duplicate") || cmd.contains("copy") -> {
+            Intent.DUPLICATES -> {
                 val dupes = scanRepository.findDuplicates(fileRepository.getRootPath()).first()
                 val allFiles = dupes.flatMap { it.files.drop(1) }
+                val wasted = dupes.sumOf { it.totalWastedSize }
                 emit(AIResponse(
-                    message = "Found ${dupes.size} groups of duplicate files (${allFiles.size} duplicates)",
+                    message = "Found ${dupes.size} groups of duplicate files (${allFiles.size} duplicates, ${FormatUtils.formatSize(wasted)} wasted space)",
                     action = AIAction.SHOW_FILES,
                     files = allFiles
                 ))
             }
-            cmd.contains("screenshot") && (cmd.contains("purani") || cmd.contains("old") || cmd.contains("delete")) -> {
-                val screenshots = fileRepository.searchByType(
+            Intent.OLD_SCREENSHOTS -> {
+                val searchPaths = listOf(
                     "/storage/emulated/0/Pictures/Screenshots",
-                    listOf(".png", ".jpg", ".jpeg")
-                ).first()
-                val thirtyDaysAgo = System.currentTimeMillis() - (30 * 24 * 60 * 60 * 1000L)
-                val oldScreenshots = screenshots.filter { it.lastModified < thirtyDaysAgo }
+                    "/storage/emulated/0/DCIM/Screenshots",
+                    "/storage/emulated/0/Screenshots"
+                )
+                val allScreenshots = mutableListOf<FileItem>()
+                for (path in searchPaths) {
+                    try {
+                        allScreenshots.addAll(fileRepository.searchByType(path, listOf(".png", ".jpg", ".jpeg", ".webp")).first())
+                    } catch (_: Exception) { }
+                }
+                val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)
+                val old = allScreenshots.filter { it.lastModified < thirtyDaysAgo }
                 emit(AIResponse(
-                    message = "Found ${oldScreenshots.size} screenshots older than 30 days",
+                    message = "Found ${old.size} screenshots older than 30 days (${FormatUtils.formatSize(old.sumOf { it.size })})",
                     action = AIAction.DELETE_FILES,
-                    files = oldScreenshots
+                    files = old.sortedBy { it.lastModified }
                 ))
             }
-            cmd.contains("android/data") || cmd.contains("android data") -> {
-                val files = fileRepository.listFiles("/storage/emulated/0/Android/data").first()
+            Intent.ANDROID_DATA -> {
+                val files = try { fileRepository.listFiles("/storage/emulated/0/Android/data").first() } catch (_: Exception) { emptyList() }
                 emit(AIResponse(
-                    message = "Android/data contains ${files.size} folders",
+                    message = "Android/data contains ${files.size} app folders. Note: Full access requires Shizuku.",
                     action = AIAction.SHOW_FILES,
                     files = files
                 ))
             }
-            cmd.contains("disguised") || cmd.contains("hidden") || cmd.contains("scan") -> {
+            Intent.DISGUISED_SCAN -> {
                 val disguised = scanRepository.scanDisguisedFiles(fileRepository.getRootPath()).first()
                 val fileItems = disguised.map { d ->
-                    FileItem(
-                        path = d.path, name = d.name, size = d.size,
-                        lastModified = 0, mimeType = d.realType, isDirectory = false
-                    )
+                    FileItem(path = d.path, name = "${d.name} [${d.realType}]", size = d.size, lastModified = 0, mimeType = d.realType, isDirectory = false)
                 }
                 emit(AIResponse(
-                    message = "Found ${disguised.size} disguised/hidden files",
+                    message = "Found ${disguised.size} suspicious files:\n" + disguised.take(5).joinToString("\n") { "• ${it.name}: ${it.reason}" },
                     action = AIAction.SHOW_FILES,
                     files = fileItems
                 ))
             }
-            cmd.contains("storage") || cmd.contains("report") || cmd.contains("space") -> {
+            Intent.STORAGE_REPORT -> {
                 val info = fileRepository.getStorageInfo()
+                val usedPct = if (info.totalBytes > 0) ((info.usedBytes * 100) / info.totalBytes).toInt() else 0
                 emit(AIResponse(
-                    message = "Storage: ${com.phantomfiles.pro.util.FormatUtils.formatSize(info.usedBytes)} used of ${com.phantomfiles.pro.util.FormatUtils.formatSize(info.totalBytes)} (${com.phantomfiles.pro.util.FormatUtils.formatSize(info.freeBytes)} free)",
+                    message = buildString {
+                        append("📊 Storage Report:\n")
+                        append("• Total: ${FormatUtils.formatSize(info.totalBytes)}\n")
+                        append("• Used: ${FormatUtils.formatSize(info.usedBytes)} ($usedPct%)\n")
+                        append("• Free: ${FormatUtils.formatSize(info.freeBytes)}\n")
+                        if (usedPct > 90) append("\n⚠️ Storage almost full! Consider cleaning junk files.")
+                        else if (usedPct > 70) append("\n💡 Tip: Run a junk scan to free space.")
+                    },
                     action = AIAction.SHOW_STORAGE
                 ))
             }
-            else -> {
-                val apiKey = settingsRepository.groqApiKey.first()
+            Intent.JUNK_CLEAN -> {
+                val junk = scanRepository.findJunkFiles(fileRepository.getRootPath()).first()
+                val empty = scanRepository.findEmptyFolders(fileRepository.getRootPath()).first()
+                val allJunk = junk + empty
+                emit(AIResponse(
+                    message = "Found ${junk.size} junk files and ${empty.size} empty folders (${FormatUtils.formatSize(junk.sumOf { it.size })} recoverable)",
+                    action = AIAction.DELETE_FILES,
+                    files = allJunk
+                ))
+            }
+            Intent.EMPTY_FOLDERS -> {
+                val empty = scanRepository.findEmptyFolders(fileRepository.getRootPath()).first()
+                emit(AIResponse(
+                    message = "Found ${empty.size} empty folders that can be safely removed",
+                    action = AIAction.DELETE_FILES,
+                    files = empty
+                ))
+            }
+            Intent.OLD_APKS -> {
+                val apks = scanRepository.findOldApks(fileRepository.getRootPath()).first()
+                emit(AIResponse(
+                    message = "Found ${apks.size} APK files (${FormatUtils.formatSize(apks.sumOf { it.size })})",
+                    action = AIAction.SHOW_FILES,
+                    files = apks.sortedByDescending { it.size }
+                ))
+            }
+            Intent.FIND_IMAGES -> {
+                val images = fileRepository.searchByType(
+                    fileRepository.getRootPath(), listOf(".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".bmp")
+                ).first()
+                emit(AIResponse(
+                    message = "Found ${images.size} images (${FormatUtils.formatSize(images.sumOf { it.size })})",
+                    action = AIAction.SHOW_FILES,
+                    files = images.sortedByDescending { it.lastModified }.take(100)
+                ))
+            }
+            Intent.FIND_VIDEOS -> {
+                val videos = fileRepository.searchByType(
+                    fileRepository.getRootPath(), listOf(".mp4", ".mkv", ".avi", ".mov", ".3gp", ".webm")
+                ).first()
+                emit(AIResponse(
+                    message = "Found ${videos.size} videos (${FormatUtils.formatSize(videos.sumOf { it.size })})",
+                    action = AIAction.SHOW_FILES,
+                    files = videos.sortedByDescending { it.size }
+                ))
+            }
+            Intent.FIND_AUDIO -> {
+                val audio = fileRepository.searchByType(
+                    fileRepository.getRootPath(), listOf(".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a")
+                ).first()
+                emit(AIResponse(
+                    message = "Found ${audio.size} audio files (${FormatUtils.formatSize(audio.sumOf { it.size })})",
+                    action = AIAction.SHOW_FILES,
+                    files = audio.sortedByDescending { it.lastModified }.take(100)
+                ))
+            }
+            Intent.FIND_DOCUMENTS -> {
+                val docs = fileRepository.searchByType(
+                    fileRepository.getRootPath(), listOf(".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv")
+                ).first()
+                emit(AIResponse(
+                    message = "Found ${docs.size} documents (${FormatUtils.formatSize(docs.sumOf { it.size })})",
+                    action = AIAction.SHOW_FILES,
+                    files = docs.sortedByDescending { it.lastModified }.take(100)
+                ))
+            }
+            Intent.FIND_DOWNLOADS -> {
+                val downloads = try {
+                    fileRepository.listFiles("/storage/emulated/0/Download").first()
+                } catch (_: Exception) { emptyList() }
+                emit(AIResponse(
+                    message = "Downloads folder has ${downloads.size} items (${FormatUtils.formatSize(downloads.sumOf { it.size })})",
+                    action = AIAction.SHOW_FILES,
+                    files = downloads.sortedByDescending { it.lastModified }
+                ))
+            }
+            Intent.RECENT_FILES -> {
+                val recent = fileRepository.getRecentFiles(fileRepository.getRootPath(), 30).first()
+                emit(AIResponse(
+                    message = "Here are your ${recent.size} most recent files",
+                    action = AIAction.SHOW_FILES,
+                    files = recent
+                ))
+            }
+            Intent.HELP -> {
+                emit(AIResponse(
+                    message = buildString {
+                        append("🤖 Main yeh sab kar sakta hoon:\n\n")
+                        append("📁 Files:\n")
+                        append("• \"Large files dikha\" / \"Show big files\"\n")
+                        append("• \"Duplicate photos hata do\"\n")
+                        append("• \"Recent files\" / \"Downloads dikha\"\n")
+                        append("• \"Find images/videos/audio/documents\"\n\n")
+                        append("🧹 Cleanup:\n")
+                        append("• \"Cache delete karo\" / \"Clear cache\"\n")
+                        append("• \"Junk files saaf karo\"\n")
+                        append("• \"Empty folders hata do\"\n")
+                        append("• \"Old screenshots delete karo\"\n")
+                        append("• \"Old APK files dhundho\"\n\n")
+                        append("🔍 Scan:\n")
+                        append("• \"Disguised files scan karo\"\n")
+                        append("• \"Storage report dikha\"\n")
+                        append("• \"WhatsApp videos dhundho\"\n")
+                        append("• \"Android/data mein kya hai\"\n\n")
+                        append("💡 Groq API key settings mein add karo for advanced commands!")
+                    }
+                ))
+            }
+            Intent.UNKNOWN -> {
+                val apiKey = try { settingsRepository.groqApiKey.first() } catch (_: Exception) { "" }
                 if (apiKey.isNotBlank()) {
-                    val response = groqApi.chat(
-                        authorization = "Bearer $apiKey",
-                        request = GroqRequest(
-                            messages = listOf(
-                                GroqMessage("system", "You are a file manager AI assistant. Help users manage files on their Android device. Keep responses short and actionable."),
-                                GroqMessage("user", command)
+                    try {
+                        val response = groqApi.chat(
+                            authorization = "Bearer $apiKey",
+                            request = GroqRequest(
+                                messages = listOf(
+                                    GroqMessage("system", "You are PhantomFiles AI, an Android file manager assistant. Help users manage files. Keep responses short (2-3 lines max), actionable, and in the same language the user uses. If they speak Hindi/Hinglish, reply in Hinglish."),
+                                    GroqMessage("user", command)
+                                )
                             )
                         )
-                    )
-                    val reply = response.choices?.firstOrNull()?.message?.content ?: "No response from AI"
-                    emit(AIResponse(message = reply))
+                        val reply = response.choices?.firstOrNull()?.message?.content ?: "No response from AI"
+                        emit(AIResponse(message = reply))
+                    } catch (e: Exception) {
+                        emit(AIResponse(message = "API error: ${e.message}\n\nTry offline commands like: 'cache clear karo', 'large files dikha', 'storage report'"))
+                    }
                 } else {
                     emit(AIResponse(
-                        message = "Command not recognized offline. Try: 'cache delete karo', 'large files dikha', 'duplicates dhundho', 'storage report'. For advanced commands, add Groq API key in Settings."
+                        message = "Yeh command samajh nahi aaya. Try:\n• \"cache delete karo\"\n• \"large files dikha\"\n• \"duplicate photos hata do\"\n• \"storage report dikha\"\n• \"help\" for all commands\n\nFor advanced AI: Add Groq API key in Settings"
                     ))
                 }
             }
         }
     }
 
+    private enum class Intent {
+        CACHE_CLEAN, WHATSAPP_MEDIA, LARGE_FILES, DUPLICATES, OLD_SCREENSHOTS,
+        ANDROID_DATA, DISGUISED_SCAN, STORAGE_REPORT, JUNK_CLEAN, EMPTY_FOLDERS,
+        OLD_APKS, FIND_IMAGES, FIND_VIDEOS, FIND_AUDIO, FIND_DOCUMENTS,
+        FIND_DOWNLOADS, RECENT_FILES, HELP, UNKNOWN
+    }
+
+    private fun detectIntent(cmd: String): Intent = when {
+        matchesAny(cmd, helpPatterns) -> Intent.HELP
+        matchesAny(cmd, cachePatterns) && matchesAny(cmd, deletePatterns + listOf("karo", "do", "kar", "clean")) -> Intent.CACHE_CLEAN
+        matchesAny(cmd, cachePatterns) -> Intent.CACHE_CLEAN
+        matchesAny(cmd, whatsappPatterns) -> Intent.WHATSAPP_MEDIA
+        matchesAny(cmd, screenshotPatterns) && matchesAny(cmd, oldPatterns + deletePatterns) -> Intent.OLD_SCREENSHOTS
+        matchesAny(cmd, duplicatePatterns) -> Intent.DUPLICATES
+        matchesAny(cmd, emptyPatterns) || (matchesAny(cmd, listOf("empty", "khali")) && cmd.contains("folder")) -> Intent.EMPTY_FOLDERS
+        matchesAny(cmd, junkPatterns) -> Intent.JUNK_CLEAN
+        matchesAny(cmd, apkPatterns) && !cmd.contains("install") -> Intent.OLD_APKS
+        matchesAny(cmd, androidDataPatterns) -> Intent.ANDROID_DATA
+        matchesAny(cmd, scanPatterns) && (matchesAny(cmd, listOf("disguised", "hidden", "chhupa", "fake"))) -> Intent.DISGUISED_SCAN
+        matchesAny(cmd, largePatterns) || cmd.contains("gb") || cmd.contains("mb") -> Intent.LARGE_FILES
+        matchesAny(cmd, storagePatterns) -> Intent.STORAGE_REPORT
+        matchesAny(cmd, downloadPatterns) -> Intent.FIND_DOWNLOADS
+        matchesAny(cmd, recentPatterns) -> Intent.RECENT_FILES
+        matchesAny(cmd, imagePatterns) && !matchesAny(cmd, whatsappPatterns) -> Intent.FIND_IMAGES
+        matchesAny(cmd, videoPatterns) && !matchesAny(cmd, whatsappPatterns) -> Intent.FIND_VIDEOS
+        matchesAny(cmd, audioPatterns) && !matchesAny(cmd, whatsappPatterns) -> Intent.FIND_AUDIO
+        matchesAny(cmd, documentPatterns) && !cmd.contains("android") -> Intent.FIND_DOCUMENTS
+        else -> Intent.UNKNOWN
+    }
+
+    private fun matchesAny(text: String, patterns: List<String>): Boolean =
+        patterns.any { text.contains(it) }
+
     private fun extractSize(cmd: String): Long {
         val gbMatch = Regex("(\\d+)\\s*gb", RegexOption.IGNORE_CASE).find(cmd)
         if (gbMatch != null) return gbMatch.groupValues[1].toLong() * 1024 * 1024 * 1024
         val mbMatch = Regex("(\\d+)\\s*mb", RegexOption.IGNORE_CASE).find(cmd)
         if (mbMatch != null) return mbMatch.groupValues[1].toLong() * 1024 * 1024
-        return 100 * 1024 * 1024
+        return 100L * 1024 * 1024
     }
 }

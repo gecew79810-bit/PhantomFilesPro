@@ -31,8 +31,11 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -67,13 +70,18 @@ import com.phantomfiles.pro.presentation.theme.PhantomPurple
 import com.phantomfiles.pro.presentation.theme.PhantomTheme
 import com.phantomfiles.pro.presentation.theme.DangerRed
 import com.phantomfiles.pro.presentation.theme.AmberWarning
+import com.phantomfiles.pro.presentation.components.ShimmerStorageCard
+import com.phantomfiles.pro.presentation.components.ShimmerFileListItem
 import com.phantomfiles.pro.util.FormatUtils
 
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onNavigateToFolder: (String, String) -> Unit = { _, _ -> },
-    onNavigateToRecycleBin: () -> Unit = {}
+    onNavigateToRecycleBin: () -> Unit = {},
+    onNavigateToVault: () -> Unit = {},
+    onNavigateToAppManager: () -> Unit = {},
+    onNavigateToNetwork: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -98,7 +106,19 @@ fun HomeScreen(
             )
         }
 
-        item { StorageCard(state) }
+        item {
+            if (state.isLoading) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    ShimmerStorageCard()
+                }
+            } else {
+                StorageCard(state)
+            }
+        }
 
         item {
             Text(
@@ -119,6 +139,15 @@ fun HomeScreen(
                 }
                 item {
                     QuickAccessCard("Recycle Bin", Icons.Default.Delete, DangerRed) { onNavigateToRecycleBin() }
+                }
+                item {
+                    QuickAccessCard("Vault", Icons.Default.Lock, PhantomPurple) { onNavigateToVault() }
+                }
+                item {
+                    QuickAccessCard("Apps", Icons.Default.Apps, AmberWarning) { onNavigateToAppManager() }
+                }
+                item {
+                    QuickAccessCard("WiFi", Icons.Default.Wifi, NeonGreen) { onNavigateToNetwork() }
                 }
             }
         }
@@ -187,7 +216,9 @@ fun HomeScreen(
             }
         }
 
-        if (state.recentFiles.isNotEmpty()) {
+        if (state.isLoading) {
+            items(3) { ShimmerFileListItem() }
+        } else if (state.recentFiles.isNotEmpty()) {
             item {
                 Text(
                     text = "Recent Files",

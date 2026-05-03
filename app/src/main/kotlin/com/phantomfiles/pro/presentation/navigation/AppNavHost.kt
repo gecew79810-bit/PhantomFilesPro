@@ -132,7 +132,10 @@ private fun MainScaffold(navController: NavHostController) {
                     onNavigateToFolder = { path, name ->
                         navController.navigate("folder_files/${Uri.encode(path)}/${Uri.encode(name)}")
                     },
-                    onNavigateToRecycleBin = { navController.navigate("recycle_bin") }
+                    onNavigateToRecycleBin = { navController.navigate("recycle_bin") },
+                    onNavigateToVault = { navController.navigate("vault") },
+                    onNavigateToAppManager = { navController.navigate("app_manager") },
+                    onNavigateToNetwork = { navController.navigate("network") }
                 )
             }
 
@@ -197,13 +200,15 @@ private fun MainScaffold(navController: NavHostController) {
 }
 
 private fun navigateToViewer(navController: NavHostController, file: FileItem) {
+    val ext = file.extension.lowercase()
     val type = when {
-        file.extension in listOf("jpg", "jpeg", "png", "gif", "webp", "heic", "bmp") -> "image"
-        file.extension in listOf("mp4", "mkv", "avi", "mov", "3gp", "webm") -> "video"
-        file.extension in listOf("mp3", "wav", "flac", "aac", "ogg", "m4a") -> "audio"
-        file.extension in listOf("pdf") -> "pdf"
-        file.extension in listOf("txt", "log", "md", "json", "xml", "html", "css", "js", "kt", "java", "py", "sh") -> "text"
-        file.extension in listOf("apk") -> "apk"
+        ext in listOf("jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "svg", "heif") -> "image"
+        ext in listOf("mp4", "mkv", "avi", "mov", "3gp", "webm", "flv", "wmv", "m4v") -> "video"
+        ext in listOf("mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "opus") -> "audio"
+        ext in listOf("pdf") -> "pdf"
+        ext in listOf("kt", "java", "py", "js", "ts", "html", "css", "xml", "json", "c", "cpp", "h", "rs", "go", "rb", "php", "sh", "yml", "yaml", "toml", "gradle", "swift", "dart") -> "code"
+        ext in listOf("txt", "log", "md", "csv", "ini", "cfg", "conf", "properties", "env", "gitignore", "dockerfile") -> "text"
+        ext in listOf("apk", "xapk") -> "apk"
         else -> "other"
     }
     navController.navigate("viewer/${Uri.encode(file.path)}/${Uri.encode(file.name)}/$type")

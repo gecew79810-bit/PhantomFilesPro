@@ -1,6 +1,7 @@
 package com.phantomfiles.pro.presentation.ai
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,11 +18,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,6 +60,12 @@ fun AIScreen(viewModel: AIViewModel = hiltViewModel()) {
     val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    val suggestions = listOf(
+        "Cache clear karo", "Large files dikha", "Duplicate photos",
+        "Storage report", "Junk files saaf karo", "WhatsApp videos",
+        "Recent files", "Empty folders", "Downloads", "Help"
+    )
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
@@ -106,6 +116,33 @@ fun AIScreen(viewModel: AIViewModel = hiltViewModel()) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Processing...", style = MaterialTheme.typography.bodySmall, color = ElectricCyan)
                     }
+                }
+            }
+        }
+
+        if (messages.size <= 1 && !isProcessing) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                suggestions.forEach { suggestion ->
+                    AssistChip(
+                        onClick = {
+                            viewModel.sendCommand(suggestion)
+                        },
+                        label = { Text(suggestion, style = MaterialTheme.typography.labelSmall) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = ElectricCyan.copy(alpha = 0.1f),
+                            labelColor = ElectricCyan
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            borderColor = ElectricCyan.copy(alpha = 0.3f),
+                            enabled = true
+                        )
+                    )
                 }
             }
         }
