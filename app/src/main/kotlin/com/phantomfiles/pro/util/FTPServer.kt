@@ -90,8 +90,10 @@ class FTPServer(
                     }
                     "CWD" -> {
                         val newDir = if (arg.startsWith("/")) arg else "$currentDir/$arg"
-                        if (File(newDir).isDirectory) {
-                            currentDir = newDir
+                        val canonicalNew = File(newDir).canonicalPath
+                        val canonicalRoot = File(rootDir).canonicalPath
+                        if (File(newDir).isDirectory && (canonicalNew == canonicalRoot || canonicalNew.startsWith(canonicalRoot + "/"))) {
+                            currentDir = canonicalNew
                             writer.println("250 Directory changed to $currentDir")
                         } else {
                             writer.println("550 Directory not found")

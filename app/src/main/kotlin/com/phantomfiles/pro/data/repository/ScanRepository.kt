@@ -29,11 +29,11 @@ class ScanRepository @Inject constructor(
         dir.listFiles()?.forEach { file ->
             try {
                 if (file.isDirectory) {
-                    if (file.name == ".nomedia") {
+                    if (File(file, ".nomedia").exists()) {
                         results.add(
                             DisguisedFile(
-                                path = dir.absolutePath,
-                                name = dir.name,
+                                path = file.absolutePath,
+                                name = file.name,
                                 size = 0,
                                 fakeExtension = ".nomedia",
                                 realType = "Hidden folder",

@@ -157,7 +157,9 @@ private fun MainScaffold(navController: NavHostController) {
                 val name = Uri.decode(backStackEntry.arguments?.getString("name") ?: "Files")
                 FilesScreen(
                     onOpenViewer = { file -> navigateToViewer(navController, file) },
-                    onExitScreen = { navController.popBackStack() }
+                    onExitScreen = { navController.popBackStack() },
+                    initialPath = path,
+                    initialName = name
                 )
             }
 

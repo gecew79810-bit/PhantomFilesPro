@@ -19,6 +19,9 @@ interface RecycleBinDao {
     @Delete
     suspend fun delete(item: RecycleBinItem)
 
+    @Query("SELECT * FROM recycle_bin WHERE deletedAt < :beforeTimestamp")
+    suspend fun getItemsOlderThan(beforeTimestamp: Long): List<RecycleBinItem>
+
     @Query("DELETE FROM recycle_bin WHERE deletedAt < :beforeTimestamp")
     suspend fun deleteOlderThan(beforeTimestamp: Long)
 
