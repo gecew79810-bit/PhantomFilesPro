@@ -34,9 +34,20 @@ class VaultViewModel @Inject constructor(
         viewModelScope.launch {
             val savedHash = settingsRepository.vaultPinHash.first()
             if (savedHash.isEmpty()) {
-                settingsRepository.setVaultPin(pin)
-                vaultPassword = pin
-                loadFiles()
+                val legacyPin = settingsRepository.vaultPinLegacy.first()
+                if (legacyPin.isNotEmpty()) {
+                    if (pin == legacyPin) {
+                        settingsRepository.setVaultPin(pin)
+                        vaultPassword = pin
+                        loadFiles()
+                    } else {
+                        _uiState.value = VaultUiState.Error("Wrong PIN")
+                    }
+                } else {
+                    settingsRepository.setVaultPin(pin)
+                    vaultPassword = pin
+                    loadFiles()
+                }
             } else {
                 val saltHex = settingsRepository.vaultPinSalt.first()
                 val salt = saltHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
