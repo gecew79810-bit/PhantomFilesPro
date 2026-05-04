@@ -45,6 +45,7 @@ class SettingsRepository @Inject constructor(
         val GROQ_API_KEY = stringPreferencesKey("groq_api_key")
         val FTP_PASSWORD = stringPreferencesKey("ftp_password")
         val FTP_PORT = intPreferencesKey("ftp_port")
+        val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
     }
 
     val showHiddenFiles: Flow<Boolean> = context.dataStore.data.map { it[SHOW_HIDDEN_FILES] ?: false }
@@ -60,6 +61,7 @@ class SettingsRepository @Inject constructor(
     val groqApiKey: Flow<String> = context.dataStore.data.map { it[GROQ_API_KEY] ?: "" }
     val ftpPassword: Flow<String> = context.dataStore.data.map { it[FTP_PASSWORD] ?: "" }
     val ftpPort: Flow<Int> = context.dataStore.data.map { it[FTP_PORT] ?: 2121 }
+    val geminiApiKey: Flow<String> = context.dataStore.data.map { it[GEMINI_API_KEY] ?: "" }
 
     suspend fun setShowHiddenFiles(show: Boolean) = context.dataStore.edit { it[SHOW_HIDDEN_FILES] = show }
     suspend fun setViewMode(mode: String) = context.dataStore.edit { it[VIEW_MODE] = mode }
@@ -81,4 +83,5 @@ class SettingsRepository @Inject constructor(
     suspend fun setGroqApiKey(key: String) = context.dataStore.edit { it[GROQ_API_KEY] = key }
     suspend fun setFtpPassword(password: String) = context.dataStore.edit { it[FTP_PASSWORD] = password }
     suspend fun setFtpPort(port: Int) = context.dataStore.edit { it[FTP_PORT] = port }
+    suspend fun setGeminiApiKey(key: String) = context.dataStore.edit { it[GEMINI_API_KEY] = key }
 }

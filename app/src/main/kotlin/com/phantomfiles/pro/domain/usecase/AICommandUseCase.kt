@@ -1,6 +1,10 @@
 package com.phantomfiles.pro.domain.usecase
 
 import com.phantomfiles.pro.data.model.FileItem
+import com.phantomfiles.pro.data.remote.GeminiApi
+import com.phantomfiles.pro.data.remote.GeminiContent
+import com.phantomfiles.pro.data.remote.GeminiPart
+import com.phantomfiles.pro.data.remote.GeminiRequest
 import com.phantomfiles.pro.data.remote.GroqApi
 import com.phantomfiles.pro.data.remote.GroqMessage
 import com.phantomfiles.pro.data.remote.GroqRequest
@@ -27,7 +31,8 @@ class AICommandUseCase @Inject constructor(
     private val fileRepository: FileRepository,
     private val scanRepository: ScanRepository,
     private val settingsRepository: SettingsRepository,
-    private val groqApi: GroqApi
+    private val groqApi: GroqApi,
+    private val geminiApi: GeminiApi
 ) {
     private val cachePatterns = listOf("cache", "cach", "kesh", "temp file", "temporary")
     private val deletePatterns = listOf("delete", "remove", "hata", "saaf", "clean", "clear", "mita", "erase", "karo saaf")
@@ -49,6 +54,7 @@ class AICommandUseCase @Inject constructor(
     private val recentPatterns = listOf("recent", "latest", "new file", "nayi file", "haal", "last")
     private val androidDataPatterns = listOf("android/data", "android data", "app data", "private folder")
     private val helpPatterns = listOf("help", "madad", "kya kar sakt", "what can", "commands", "features")
+    private val findFilePatterns = listOf("find", "dhundh", "khoj", "search", "locate", "where is", "kahan", "kaha")
 
     fun processCommand(command: String): Flow<AIResponse> = flow {
         val cmd = command.lowercase().trim()
@@ -273,12 +279,46 @@ class AICommandUseCase @Inject constructor(
                     }
                 ))
             }
+            Intent.FIND_FILE_BY_NAME -> {
+                val query = cmd
+                    .replace(Regex("\\b(find|dhundh|khoj|search|locate|where is|kahan|kaha|kar|karo|do|file|named|naam)\\b"), "")
+                    .trim()
+                    .ifEmpty { cmd }
+                if (query.length >= 2) {
+                    val results = fileRepository.searchFiles(fileRepository.getRootPath(), query).first()
+                    emit(AIResponse(
+                        message = if (results.isNotEmpty()) "Found ${results.size} files matching \"$query\" (${FormatUtils.formatSize(results.sumOf { it.size })})" else "No files found matching \"$query\"",
+                        action = AIAction.SHOW_FILES,
+                        files = results.sortedByDescending { it.lastModified }.take(100)
+                    ))
+                } else {
+                    emit(AIResponse(message = "Please specify what to search for. Example: \"find report.pdf\" or \"dhundh screenshot\""))
+                }
+            }
             Intent.UNKNOWN -> {
-                val apiKey = try { settingsRepository.groqApiKey.first() } catch (_: Exception) { "" }
-                if (apiKey.isNotBlank()) {
+                val groqKey = try { settingsRepository.groqApiKey.first() } catch (_: Exception) { "" }
+                val geminiKey = try { settingsRepository.geminiApiKey.first() } catch (_: Exception) { "" }
+                if (geminiKey.isNotBlank()) {
+                    try {
+                        val response = geminiApi.generate(
+                            apiKey = geminiKey,
+                            request = GeminiRequest(
+                                contents = listOf(
+                                    GeminiContent(parts = listOf(
+                                        GeminiPart("You are PhantomFiles AI, an Android file manager assistant. Help users manage files. Keep responses short (2-3 lines max), actionable, and in the same language the user uses. If Hindi/Hinglish, reply in Hinglish.\n\nUser: $command")
+                                    ))
+                                )
+                            )
+                        )
+                        val reply = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No response from Gemini"
+                        emit(AIResponse(message = reply))
+                    } catch (e: Exception) {
+                        emit(AIResponse(message = "Gemini error: ${e.message}\n\nTry offline commands: 'cache clear karo', 'large files dikha'"))
+                    }
+                } else if (groqKey.isNotBlank()) {
                     try {
                         val response = groqApi.chat(
-                            authorization = "Bearer $apiKey",
+                            authorization = "Bearer $groqKey",
                             request = GroqRequest(
                                 messages = listOf(
                                     GroqMessage("system", "You are PhantomFiles AI, an Android file manager assistant. Help users manage files. Keep responses short (2-3 lines max), actionable, and in the same language the user uses. If they speak Hindi/Hinglish, reply in Hinglish."),
@@ -289,11 +329,11 @@ class AICommandUseCase @Inject constructor(
                         val reply = response.choices?.firstOrNull()?.message?.content ?: "No response from AI"
                         emit(AIResponse(message = reply))
                     } catch (e: Exception) {
-                        emit(AIResponse(message = "API error: ${e.message}\n\nTry offline commands like: 'cache clear karo', 'large files dikha', 'storage report'"))
+                        emit(AIResponse(message = "API error: ${e.message}\n\nTry offline commands: 'cache clear karo', 'large files dikha'"))
                     }
                 } else {
                     emit(AIResponse(
-                        message = "Yeh command samajh nahi aaya. Try:\n• \"cache delete karo\"\n• \"large files dikha\"\n• \"duplicate photos hata do\"\n• \"storage report dikha\"\n• \"help\" for all commands\n\nFor advanced AI: Add Groq API key in Settings"
+                        message = "Yeh command samajh nahi aaya. Try:\n• \"cache delete karo\"\n• \"large files dikha\"\n• \"find [filename]\"\n• \"storage report dikha\"\n• \"help\" for all commands\n\nFor advanced AI: Add Gemini or Groq API key in Settings"
                     ))
                 }
             }
@@ -304,11 +344,17 @@ class AICommandUseCase @Inject constructor(
         CACHE_CLEAN, WHATSAPP_MEDIA, LARGE_FILES, DUPLICATES, OLD_SCREENSHOTS,
         ANDROID_DATA, DISGUISED_SCAN, STORAGE_REPORT, JUNK_CLEAN, EMPTY_FOLDERS,
         OLD_APKS, FIND_IMAGES, FIND_VIDEOS, FIND_AUDIO, FIND_DOCUMENTS,
-        FIND_DOWNLOADS, RECENT_FILES, HELP, UNKNOWN
+        FIND_DOWNLOADS, RECENT_FILES, FIND_FILE_BY_NAME, HELP, UNKNOWN
     }
+
+    private val fileExtensionRegex = Regex("\\.[a-zA-Z0-9]{1,6}(\\s|$)")
+
+    private fun looksLikeFileSearch(cmd: String): Boolean =
+        matchesAny(cmd, findFilePatterns) && fileExtensionRegex.containsMatchIn(cmd)
 
     private fun detectIntent(cmd: String): Intent = when {
         matchesAny(cmd, helpPatterns) -> Intent.HELP
+        looksLikeFileSearch(cmd) -> Intent.FIND_FILE_BY_NAME
         matchesAny(cmd, cachePatterns) && matchesAny(cmd, deletePatterns + listOf("karo", "do", "kar", "clean")) -> Intent.CACHE_CLEAN
         matchesAny(cmd, cachePatterns) -> Intent.CACHE_CLEAN
         matchesAny(cmd, whatsappPatterns) -> Intent.WHATSAPP_MEDIA
@@ -327,6 +373,7 @@ class AICommandUseCase @Inject constructor(
         matchesAny(cmd, videoPatterns) && !matchesAny(cmd, whatsappPatterns) -> Intent.FIND_VIDEOS
         matchesAny(cmd, audioPatterns) && !matchesAny(cmd, whatsappPatterns) -> Intent.FIND_AUDIO
         matchesAny(cmd, documentPatterns) && !cmd.contains("android") -> Intent.FIND_DOCUMENTS
+        matchesAny(cmd, findFilePatterns) -> Intent.FIND_FILE_BY_NAME
         else -> Intent.UNKNOWN
     }
 

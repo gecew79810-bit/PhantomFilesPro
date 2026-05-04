@@ -9,7 +9,9 @@ import com.phantomfiles.pro.data.local.PhantomDatabase
 import com.phantomfiles.pro.data.local.RecycleBinDao
 import com.phantomfiles.pro.data.local.ScanResultDao
 import com.phantomfiles.pro.data.local.VaultDao
+import com.phantomfiles.pro.data.remote.GeminiApi
 import com.phantomfiles.pro.data.remote.GroqApi
+import javax.inject.Named
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -58,4 +60,14 @@ object AppModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GroqApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGeminiApi(client: OkHttpClient): GeminiApi =
+        Retrofit.Builder()
+            .baseUrl("https://generativelanguage.googleapis.com/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(GeminiApi::class.java)
 }

@@ -20,6 +20,7 @@ data class SettingsState(
     val recycleBinSizeMb: Int = 500,
     val autoCleanCache: Boolean = false,
     val groqApiKey: String = "",
+    val geminiApiKey: String = "",
     val ftpPort: Int = 2121,
     val shizukuAvailable: Boolean = false,
     val shizukuConnected: Boolean = false,
@@ -60,9 +61,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             combine(
                 settingsRepository.ftpPassword,
-                settingsRepository.autoCleanCache
-            ) { ftpPwd, autoClean ->
-                _state.value.copy(ftpPassword = ftpPwd, autoCleanCache = autoClean)
+                settingsRepository.autoCleanCache,
+                settingsRepository.geminiApiKey
+            ) { ftpPwd, autoClean, geminiKey ->
+                _state.value.copy(ftpPassword = ftpPwd, autoCleanCache = autoClean, geminiApiKey = geminiKey)
             }.collect { _state.value = it }
         }
     }
@@ -75,6 +77,7 @@ class SettingsViewModel @Inject constructor(
     fun setAutoCleanCache(enabled: Boolean) { viewModelScope.launch { settingsRepository.setAutoCleanCache(enabled) } }
 
     fun setFtpPassword(password: String) { viewModelScope.launch { settingsRepository.setFtpPassword(password) } }
+    fun setGeminiApiKey(key: String) { viewModelScope.launch { settingsRepository.setGeminiApiKey(key) } }
 
     fun requestShizukuPermission() { shizukuRepository.requestPermission() }
 }

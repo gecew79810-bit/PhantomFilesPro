@@ -58,6 +58,7 @@ import com.phantomfiles.pro.presentation.theme.PhantomTheme
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showApiKeyDialog by remember { mutableStateOf(false) }
+    var showGeminiKeyDialog by remember { mutableStateOf(false) }
     var showRecycleDaysDialog by remember { mutableStateOf(false) }
     var showFtpPasswordDialog by remember { mutableStateOf(false) }
 
@@ -151,7 +152,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         item {
             SettingsCard(
                 icon = Icons.Default.SmartToy,
-                title = "Groq API Key",
+                title = "Gemini API Key (Recommended)",
+                subtitle = if (state.geminiApiKey.isNotEmpty()) "Configured" else "Not set - get key from aistudio.google.com",
+                iconTint = if (state.geminiApiKey.isNotEmpty()) NeonGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = { showGeminiKeyDialog = true }
+            )
+        }
+        item {
+            SettingsCard(
+                icon = Icons.Default.SmartToy,
+                title = "Groq API Key (Fallback)",
                 subtitle = if (state.groqApiKey.isNotEmpty()) "Configured" else "Not set (offline mode)",
                 iconTint = if (state.groqApiKey.isNotEmpty()) NeonGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                 onClick = { showApiKeyDialog = true }
@@ -255,6 +265,32 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 }
             },
             dismissButton = { TextButton(onClick = { showApiKeyDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showGeminiKeyDialog) {
+        var key by remember { mutableStateOf(state.geminiApiKey) }
+        AlertDialog(
+            onDismissRequest = { showGeminiKeyDialog = false },
+            title = { Text("Gemini API Key") },
+            text = {
+                Column {
+                    Text("Get your free key from aistudio.google.com/apikey", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = key,
+                        onValueChange = { key = it },
+                        placeholder = { Text("AIza...") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.setGeminiApiKey(key); showGeminiKeyDialog = false }) {
+                    Text("Save", color = ElectricCyan)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showGeminiKeyDialog = false }) { Text("Cancel") } }
         )
     }
 }
