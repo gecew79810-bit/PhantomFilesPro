@@ -53,6 +53,7 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 shizuku-api = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }
 shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", version.ref = "shizuku" }
 gson = { group = "com.google.code.gson", name = "gson", version = "2.11.0" }
+security-crypto = { group = "androidx.security", name = "security-crypto", version = "1.1.0-alpha06" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,11 +1,15 @@
 package com.phantomfiles.pro.presentation.vault
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKeys
 import com.phantomfiles.pro.data.model.VaultFile
 import com.phantomfiles.pro.data.repository.SettingsRepository
 import com.phantomfiles.pro.data.repository.VaultRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -22,13 +26,33 @@ sealed class VaultUiState {
 @HiltViewModel
 class VaultViewModel @Inject constructor(
     private val vaultRepository: VaultRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<VaultUiState>(VaultUiState.Locked)
     val uiState: StateFlow<VaultUiState> = _uiState
 
     private var vaultPassword: String = ""
+
+    private val encryptedPrefs by lazy {
+        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        EncryptedSharedPreferences.create(
+            "vault_secure_prefs",
+            masterKeyAlias,
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+
+    private fun saveVaultPinSecure(pin: String) {
+        encryptedPrefs.edit().putString("vault_pin_secure", pin).apply()
+    }
+
+    private fun getVaultPinSecure(): String? {
+        return encryptedPrefs.getString("vault_pin_secure", null)
+    }
 
     fun unlock(pin: String) {
         viewModelScope.launch {
@@ -39,6 +63,7 @@ class VaultViewModel @Inject constructor(
                     if (pin == legacyPin) {
                         settingsRepository.setVaultPin(pin)
                         vaultPassword = pin
+                        saveVaultPinSecure(pin)
                         loadFiles()
                     } else {
                         _uiState.value = VaultUiState.Error("Wrong PIN")
@@ -46,6 +71,7 @@ class VaultViewModel @Inject constructor(
                 } else {
                     settingsRepository.setVaultPin(pin)
                     vaultPassword = pin
+                    saveVaultPinSecure(pin)
                     loadFiles()
                 }
             } else {
@@ -54,6 +80,7 @@ class VaultViewModel @Inject constructor(
                 val inputHash = SettingsRepository.hashPin(pin, salt)
                 if (inputHash == savedHash) {
                     vaultPassword = pin
+                    saveVaultPinSecure(pin)
                     loadFiles()
                 } else {
                     _uiState.value = VaultUiState.Error("Wrong PIN")
@@ -92,8 +119,13 @@ class VaultViewModel @Inject constructor(
 
     fun unlockViaBiometric() {
         viewModelScope.launch {
-            vaultPassword = "biometric_unlock"
-            loadFiles()
+            val securePin = getVaultPinSecure()
+            if (securePin != null) {
+                vaultPassword = securePin
+                loadFiles()
+            } else {
+                _uiState.value = VaultUiState.Error("Set up PIN first, then use biometric")
+            }
         }
     }
 
