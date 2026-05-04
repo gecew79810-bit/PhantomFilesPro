@@ -64,7 +64,8 @@ fun AIScreen(viewModel: AIViewModel = hiltViewModel()) {
     val suggestions = listOf(
         "Cache clear karo", "Large files dikha", "Duplicate photos",
         "Storage report", "Junk files saaf karo", "WhatsApp videos",
-        "Recent files", "Empty folders", "Downloads", "Help"
+        "Recent files", "Empty folders", "Downloads", "Find report.pdf",
+        "Dhundh screenshot", "Help"
     )
 
     LaunchedEffect(messages.size) {
@@ -92,7 +93,7 @@ fun AIScreen(viewModel: AIViewModel = hiltViewModel()) {
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text("AI Assistant", style = MaterialTheme.typography.headlineSmall, color = ElectricCyan)
-                Text("Offline + Groq API", style = MaterialTheme.typography.labelSmall, color = PhantomPurple)
+                Text("Gemini + Groq + Offline", style = MaterialTheme.typography.labelSmall, color = PhantomPurple)
             }
         }
 

@@ -18,7 +18,9 @@ fun HomeScreen(
     onNavigateToNetwork: () -> Unit = {},
     onNavigateToScanner: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToAI: () -> Unit = {}
+    onNavigateToAI: () -> Unit = {},
+    onNavigateToAllTools: () -> Unit = {},
+    onNavigateToAnalyzer: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -67,39 +69,45 @@ fun HomeScreen(
             storageUsedPercent = usedPercent,
             usedStorageText = FormatUtils.formatSize(used),
             freeStorageText = FormatUtils.formatSize(free),
-            junkText = if (state.largeFiles.isNotEmpty()) FormatUtils.formatSize(state.largeFiles.sumOf { it.size }) else "0 B",
-            junkItemsText = "${state.largeFiles.size} items",
-            duplicatesText = "Scan to find",
-            duplicateGroupsText = "0 groups",
-            hiddenCountText = "0",
-            disguisedCountText = "0",
+            junkText = if (state.junkSize > 0) FormatUtils.formatSize(state.junkSize) else if (state.largeFiles.isNotEmpty()) FormatUtils.formatSize(state.largeFiles.sumOf { it.size }) else "0 B",
+            junkItemsText = "${if (state.junkCount > 0) state.junkCount else state.largeFiles.size} items",
+            duplicatesText = if (state.duplicateSize > 0) FormatUtils.formatSize(state.duplicateSize) else "Scan to find",
+            duplicateGroupsText = "${state.duplicateGroups} groups",
+            hiddenCountText = "${state.hiddenCount}",
+            disguisedCountText = "${state.disguisedCount}",
             systemHealthText = healthText,
             systemNote1 = note1,
             systemNote2 = note2,
             aiOnline = true,
-            grokStatusText = "GROQ",
+            grokStatusText = "GEMINI",
             logLine = "Ready",
             aiLines = emptyList(),
             recentResults = recent,
-            storageBreakdown = breakdown
+            storageBreakdown = breakdown,
+            isScanning = state.isScanning,
+            scanProgress = state.scanProgress,
+            scanStatusText = state.scanStatusText,
+            scanResultText = state.scanResultText
         )
     }
 
     FuturisticDashboard(
         state = dashboardState,
-        onSmartScan = onNavigateToScanner,
-        onDeepScan = onNavigateToScanner,
-        onCleanAll = onNavigateToScanner,
+        onSmartScan = { viewModel.smartScan() },
+        onDeepScan = { viewModel.deepScan() },
+        onCleanAll = { viewModel.cleanAll() },
         onAutoFix = onNavigateToAI,
         onUnlock = onNavigateToVault,
         onPickFolder = { onNavigateToFolder("/storage/emulated/0", "Internal Storage") },
         onPause = { },
         onResume = { },
-        onCancel = { },
+        onCancel = { viewModel.cancelScan() },
         onMenu = { },
         onSettings = onNavigateToSettings,
         onViewAllRecent = { onNavigateToFolder("/storage/emulated/0", "Internal Storage") },
         onRecentItemClick = { },
-        onCommandRun = { onNavigateToAI() }
+        onCommandRun = { onNavigateToAI() },
+        onAllTools = onNavigateToAllTools,
+        onAnalyze = onNavigateToAnalyzer
     )
 }

@@ -55,7 +55,11 @@ data class DashboardUiState(
     val logLine: String = "Ready",
     val aiLines: List<String> = emptyList(),
     val recentResults: List<RecentItem> = emptyList(),
-    val storageBreakdown: List<StorageBreakdownItem> = emptyList()
+    val storageBreakdown: List<StorageBreakdownItem> = emptyList(),
+    val isScanning: Boolean = false,
+    val scanProgress: Float = 0f,
+    val scanStatusText: String = "",
+    val scanResultText: String = ""
 )
 
 data class RecentItem(
@@ -88,7 +92,9 @@ fun FuturisticDashboard(
     onSettings: () -> Unit,
     onViewAllRecent: () -> Unit,
     onRecentItemClick: (RecentItem) -> Unit,
-    onCommandRun: (String) -> Unit
+    onCommandRun: (String) -> Unit,
+    onAllTools: () -> Unit = {},
+    onAnalyze: () -> Unit = {}
 ) {
     val pulse = rememberInfiniteTransition(label = "pulse")
     val glow by pulse.animateFloat(
@@ -134,7 +140,9 @@ fun FuturisticDashboard(
                     onMenu = onMenu,
                     onPickFolder = onPickFolder,
                     onSettings = onSettings,
-                    onUnlock = onUnlock
+                    onUnlock = onUnlock,
+                    onAnalyze = onAnalyze,
+                    onDeepScan = onDeepScan
                 )
             }
 
@@ -161,7 +169,13 @@ fun FuturisticDashboard(
                     onAutoFix = onAutoFix,
                     onPause = onPause,
                     onResume = onResume,
-                    onCancel = onCancel
+                    onCancel = onCancel,
+                    isScanning = state.isScanning,
+                    scanProgress = state.scanProgress,
+                    scanStatusText = state.scanStatusText,
+                    scanResultText = state.scanResultText,
+                    onAllTools = onAllTools,
+                    onAnalyze = onAnalyze
                 )
             }
 
@@ -201,8 +215,12 @@ private fun TopHeader(
     onMenu: () -> Unit,
     onPickFolder: () -> Unit,
     onSettings: () -> Unit,
-    onUnlock: () -> Unit
+    onUnlock: () -> Unit,
+    onAnalyze: () -> Unit = {},
+    onDeepScan: () -> Unit = {}
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -241,7 +259,29 @@ private fun TopHeader(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             IconShell(Icons.Filled.FolderOpen, onClick = onPickFolder)
-            IconShell(Icons.Filled.Settings, onClick = onSettings)
+            Box {
+                IconShell(Icons.Filled.MoreVert, onClick = { showMenu = true })
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Analyze Storage") },
+                        onClick = { showMenu = false; onAnalyze() },
+                        leadingIcon = { Icon(Icons.Filled.Analytics, contentDescription = null, tint = PfBlue) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Deep Scan") },
+                        onClick = { showMenu = false; onDeepScan() },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = PfPurple) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Settings") },
+                        onClick = { showMenu = false; onSettings() },
+                        leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null, tint = PfTextDim) }
+                    )
+                }
+            }
         }
     }
 }
@@ -345,7 +385,13 @@ private fun QuickActions(
     onAutoFix: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    isScanning: Boolean = false,
+    scanProgress: Float = 0f,
+    scanStatusText: String = "",
+    scanResultText: String = "",
+    onAllTools: () -> Unit = {},
+    onAnalyze: () -> Unit = {}
 ) {
     GlassCard {
         Text("QUICK ACTIONS", color = PfTextDim, fontSize = 12.sp, letterSpacing = 1.sp)
@@ -356,12 +402,38 @@ private fun QuickActions(
             NeonActionButton("Clean All", Icons.Filled.CleaningServices, PfGreen, Modifier.weight(1f), onCleanAll)
             NeonActionButton("AI Auto Fix", Icons.Filled.Bolt, PfBlue2, Modifier.weight(1f), onAutoFix)
         }
+
+        if (isScanning) {
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { scanProgress },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = PfBlue,
+                trackColor = PfStroke
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(scanStatusText, color = PfBlue, fontSize = 12.sp)
+                Text("${(scanProgress * 100).toInt()}%", color = PfText, fontSize = 12.sp)
+            }
+        }
+
+        if (scanResultText.isNotEmpty() && !isScanning) {
+            Spacer(Modifier.height(8.dp))
+            Text(scanResultText, color = PfGreen, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        }
+
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            NeonActionButton("Pause", Icons.Filled.Pause, PfAmber, Modifier.weight(1f), onPause)
-            NeonActionButton("Resume", Icons.Filled.PlayArrow, PfGreen, Modifier.weight(1f), onResume)
-            NeonActionButton("Cancel", Icons.Filled.Close, PfRed, Modifier.weight(1f), onCancel)
-            Spacer(Modifier.weight(1f))
+            if (isScanning) {
+                NeonActionButton("Pause", Icons.Filled.Pause, PfAmber, Modifier.weight(1f), onPause)
+                NeonActionButton("Cancel", Icons.Filled.Close, PfRed, Modifier.weight(1f), onCancel)
+            }
+            NeonActionButton("Analyze", Icons.Filled.Analytics, PfAmber, Modifier.weight(1f), onAnalyze)
+            NeonActionButton("All Tools", Icons.Filled.GridView, PfPink, Modifier.weight(1f), onAllTools)
         }
     }
 }

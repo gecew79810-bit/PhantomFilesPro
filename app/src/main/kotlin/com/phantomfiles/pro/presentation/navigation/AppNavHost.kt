@@ -41,6 +41,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.phantomfiles.pro.data.model.FileItem
 import com.phantomfiles.pro.presentation.ai.AIScreen
+import com.phantomfiles.pro.presentation.analyzer.StorageAnalyzerScreen
 import com.phantomfiles.pro.presentation.appmanager.AppManagerScreen
 import com.phantomfiles.pro.presentation.files.FilesScreen
 import com.phantomfiles.pro.presentation.home.HomeScreen
@@ -49,6 +50,7 @@ import com.phantomfiles.pro.presentation.permission.PermissionScreen
 import com.phantomfiles.pro.presentation.recycle.RecycleScreen
 import com.phantomfiles.pro.presentation.scanner.ScannerScreen
 import com.phantomfiles.pro.presentation.settings.SettingsScreen
+import com.phantomfiles.pro.presentation.tools.AllToolsScreen
 import com.phantomfiles.pro.presentation.vault.VaultScreen
 import com.phantomfiles.pro.presentation.viewer.FileViewerScreen
 import com.phantomfiles.pro.presentation.theme.ElectricCyan
@@ -156,7 +158,9 @@ private fun MainScaffold(navController: NavHostController) {
                             launchSingleTop = true
                             restoreState = true
                         }
-                    }
+                    },
+                    onNavigateToAllTools = { navController.navigate("all_tools") },
+                    onNavigateToAnalyzer = { navController.navigate("analyzer") }
                 )
             }
 
@@ -201,6 +205,48 @@ private fun MainScaffold(navController: NavHostController) {
 
             composable("network") {
                 NetworkScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable("all_tools") {
+                AllToolsScreen(
+                    onBack = { navController.popBackStack() },
+                    onToolClick = { route ->
+                        when (route) {
+                            "analyze" -> navController.navigate("analyzer")
+                            "deep_scan" -> navController.navigate("scanner")
+                            "recycle_bin" -> navController.navigate("recycle_bin")
+                            "vault" -> navController.navigate("vault")
+                            "app_manager" -> navController.navigate("app_manager")
+                            "network", "ftp" -> navController.navigate("network")
+                            "ai" -> navController.navigate("ai") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                            "settings" -> navController.navigate("settings") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                            "disguised", "duplicates", "large_files", "junk_clean", "empty_folders", "storage_report" -> navController.navigate("scanner")
+                            "category_images" -> navController.navigate("folder_files/${Uri.encode("/storage/emulated/0/DCIM")}/${Uri.encode("Images")}")
+                            "category_videos" -> navController.navigate("folder_files/${Uri.encode("/storage/emulated/0/Movies")}/${Uri.encode("Videos")}")
+                            "category_audio" -> navController.navigate("folder_files/${Uri.encode("/storage/emulated/0/Music")}/${Uri.encode("Audio")}")
+                            "category_documents" -> navController.navigate("folder_files/${Uri.encode("/storage/emulated/0/Documents")}/${Uri.encode("Documents")}")
+                            "category_apks" -> navController.navigate("folder_files/${Uri.encode("/storage/emulated/0/Download")}/${Uri.encode("APKs")}")
+                            "category_compressed" -> navController.navigate("folder_files/${Uri.encode("/storage/emulated/0/Download")}/${Uri.encode("Compressed")}")
+                            "category_downloads" -> navController.navigate("folder_files/${Uri.encode("/storage/emulated/0/Download")}/${Uri.encode("Downloads")}")
+                            "bookmarks" -> navController.navigate("files")
+                            else -> navController.navigate("files")
+                        }
+                    }
+                )
+            }
+
+            composable("analyzer") {
+                StorageAnalyzerScreen(
+                    onBack = { navController.popBackStack() }
+                )
             }
 
             composable(
