@@ -160,8 +160,10 @@ class HomeViewModel @Inject constructor(
                 all.forEachIndexed { idx, file ->
                     try {
                         val f = File(file.path)
-                        if (f.exists()) { if (f.isDirectory) f.deleteRecursively() else f.delete() }
-                        cleaned++
+                        val deleted = if (f.exists()) {
+                            if (f.isDirectory) f.deleteRecursively() else f.delete()
+                        } else false
+                        if (deleted) cleaned++
                     } catch (_: Exception) { }
                     _state.value = _state.value.copy(
                         scanProgress = 0.4f + (0.55f * (idx + 1) / all.size),
@@ -173,7 +175,7 @@ class HomeViewModel @Inject constructor(
                     scanProgress = 1f,
                     isScanning = false,
                     scanStatusText = "",
-                    scanResultText = "Cleaned $cleaned items (${FormatUtils.formatSize(junk.sumOf { it.size })} freed)"
+                    scanResultText = "Cleaned $cleaned/${all.size} items"
                 )
                 loadDashboard()
             } catch (_: Exception) {

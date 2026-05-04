@@ -347,8 +347,14 @@ class AICommandUseCase @Inject constructor(
         FIND_DOWNLOADS, RECENT_FILES, FIND_FILE_BY_NAME, HELP, UNKNOWN
     }
 
+    private val fileExtensionRegex = Regex("\\.[a-zA-Z0-9]{1,6}(\\s|$)")
+
+    private fun looksLikeFileSearch(cmd: String): Boolean =
+        matchesAny(cmd, findFilePatterns) && fileExtensionRegex.containsMatchIn(cmd)
+
     private fun detectIntent(cmd: String): Intent = when {
         matchesAny(cmd, helpPatterns) -> Intent.HELP
+        looksLikeFileSearch(cmd) -> Intent.FIND_FILE_BY_NAME
         matchesAny(cmd, cachePatterns) && matchesAny(cmd, deletePatterns + listOf("karo", "do", "kar", "clean")) -> Intent.CACHE_CLEAN
         matchesAny(cmd, cachePatterns) -> Intent.CACHE_CLEAN
         matchesAny(cmd, whatsappPatterns) -> Intent.WHATSAPP_MEDIA
