@@ -243,7 +243,7 @@ class FileRepository @Inject constructor() {
                     var count = 0
                     while (entry != null) {
                         val outFile = File(destFolder, entry.name)
-                        if (!outFile.canonicalPath.startsWith(destFolder.canonicalPath)) {
+                        if (!outFile.canonicalPath.startsWith(destFolder.canonicalPath + File.separator)) {
                             throw SecurityException("Zip path traversal detected")
                         }
                         if (entry.isDirectory) {

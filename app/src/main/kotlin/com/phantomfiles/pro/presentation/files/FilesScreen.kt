@@ -335,7 +335,7 @@ fun FilesScreen(
                                     onRename = { showRenameDialog = file },
                                     onShare = { shareFileReal(context, file) },
                                     onProperties = { showPropertiesFile = file },
-                                    onExtract = if (file.fileType == FileType.ARCHIVE) { { viewModel.extractZip(file.path) } } else null
+                                    onExtract = if (file.fileType == FileType.ARCHIVE && file.extension.lowercase() == "zip") { { viewModel.extractZip(file.path) } } else null
                                 )
                             }
                         }
