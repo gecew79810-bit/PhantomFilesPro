@@ -74,4 +74,5 @@ dependencies {
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
     implementation(libs.gson)
+    implementation(libs.security.crypto)
 }
