@@ -347,7 +347,7 @@ class AICommandUseCase @Inject constructor(
         FIND_DOWNLOADS, RECENT_FILES, FIND_FILE_BY_NAME, HELP, UNKNOWN
     }
 
-    private val fileExtensionRegex = Regex("(?<!\\d)\\.[a-zA-Z0-9]{1,6}(\\s|$)")
+    private val fileExtensionRegex = Regex("\\.[a-zA-Z][a-zA-Z0-9]{0,5}(\\s|$)|(?<!\\d)\\.[0-9][a-zA-Z0-9]{0,5}(\\s|$)")
 
     private fun looksLikeFileSearch(cmd: String): Boolean =
         matchesAny(cmd, findFilePatterns) && fileExtensionRegex.containsMatchIn(cmd)
