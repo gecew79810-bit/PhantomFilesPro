@@ -151,7 +151,8 @@ class StorageAnalyzerViewModel @Inject constructor(
                     duplicateWastedSize = duplicates.sumOf { it.totalWastedSize }
                 )
 
-                val cleanable = residual.sumOf { it.size } + redundant.sumOf { it.size } + emptyFolders.size * 4096L + sortedCaches.sumOf { it.second }
+                val allRedundant = redundant + oldApks
+                val cleanable = residual.sumOf { it.size } + allRedundant.sumOf { it.size } + emptyFolders.size * 4096L
                 _state.value = _state.value.copy(totalCleanableSize = cleanable, isAnalyzing = false)
             } catch (_: Exception) {
                 _state.value = _state.value.copy(isAnalyzing = false)
@@ -167,6 +168,15 @@ class StorageAnalyzerViewModel @Inject constructor(
                     val f = File(file.path)
                     if (f.exists()) { if (f.isDirectory) f.deleteRecursively() else f.delete() }
                 } catch (_: Exception) { }
+            }
+            val cacheDirs = listOf("cache", "Cache", ".cache", "code_cache")
+            _state.value.appCaches.forEach { (appItem, _) ->
+                cacheDirs.forEach { cName ->
+                    try {
+                        val cDir = File(appItem.path, cName)
+                        if (cDir.exists()) cDir.deleteRecursively()
+                    } catch (_: Exception) { }
+                }
             }
             startAnalysis()
         }
