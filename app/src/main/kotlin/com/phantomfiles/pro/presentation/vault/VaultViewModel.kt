@@ -47,11 +47,17 @@ class VaultViewModel @Inject constructor(
     }
 
     private fun saveVaultPinSecure(pin: String) {
-        encryptedPrefs.edit().putString("vault_pin_secure", pin).apply()
+        try {
+            encryptedPrefs.edit().putString("vault_pin_secure", pin).apply()
+        } catch (_: Exception) { }
     }
 
     private fun getVaultPinSecure(): String? {
-        return encryptedPrefs.getString("vault_pin_secure", null)
+        return try {
+            encryptedPrefs.getString("vault_pin_secure", null)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun unlock(pin: String) {

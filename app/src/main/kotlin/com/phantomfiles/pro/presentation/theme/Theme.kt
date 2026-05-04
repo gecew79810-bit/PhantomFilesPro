@@ -22,6 +22,21 @@ val DividerColor = Color(0xFF2A2A3E)
 val CyanGlow = Color(0x1A00E5FF)
 val PurpleGlow = Color(0x1A7C4DFF)
 
+// Futuristic dashboard palette
+val PfBg = Color(0xFF050814)
+val PfPanel = Color(0xFF060B14)
+val PfPanelAlt = Color(0xFF08111F)
+val PfStroke = Color(0xFF183764)
+val PfBlue = Color(0xFF19D9FF)
+val PfBlue2 = Color(0xFF23C7FF)
+val PfPurple = Color(0xFF9A4DFF)
+val PfGreen = Color(0xFF2BFF88)
+val PfPink = Color(0xFFFF4FD8)
+val PfRed = Color(0xFFFF5A7A)
+val PfAmber = Color(0xFFFFC233)
+val PfText = Color(0xFFEAF2FF)
+val PfTextDim = Color(0xFF9EB0D6)
+
 private val PhantomColorScheme = darkColorScheme(
     primary = ElectricCyan,
     onPrimary = DeepBlack,

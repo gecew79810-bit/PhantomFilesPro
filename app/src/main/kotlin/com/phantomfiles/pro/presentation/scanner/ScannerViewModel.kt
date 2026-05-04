@@ -130,12 +130,17 @@ class ScannerViewModel @Inject constructor(
                 } catch (_: Exception) { }
             }
             val pathSet = paths.toSet()
+            val updatedDuplicates = _state.value.duplicates.map { group ->
+                val filteredFiles = group.files.filter { it.path !in pathSet }
+                group.copy(files = filteredFiles, totalWastedSize = if (filteredFiles.size > 1) filteredFiles.drop(1).sumOf { it.size } else 0L)
+            }.filter { it.files.size > 1 }
             _state.value = _state.value.copy(
                 junkFiles = _state.value.junkFiles.filter { it.path !in pathSet },
                 largeFiles = _state.value.largeFiles.filter { it.path !in pathSet },
                 emptyFolders = _state.value.emptyFolders.filter { it.path !in pathSet },
                 oldApks = _state.value.oldApks.filter { it.path !in pathSet },
                 disguisedFiles = _state.value.disguisedFiles.filter { it.path !in pathSet },
+                duplicates = updatedDuplicates,
                 totalJunkSize = _state.value.junkFiles.filter { it.path !in pathSet }.sumOf { it.size }
             )
         }

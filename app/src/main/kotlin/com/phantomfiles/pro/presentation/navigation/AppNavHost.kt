@@ -135,7 +135,28 @@ private fun MainScaffold(navController: NavHostController) {
                     onNavigateToRecycleBin = { navController.navigate("recycle_bin") },
                     onNavigateToVault = { navController.navigate("vault") },
                     onNavigateToAppManager = { navController.navigate("app_manager") },
-                    onNavigateToNetwork = { navController.navigate("network") }
+                    onNavigateToNetwork = { navController.navigate("network") },
+                    onNavigateToScanner = {
+                        navController.navigate("scanner") {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate("settings") {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToAI = {
+                        navController.navigate("ai") {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 )
             }
 
