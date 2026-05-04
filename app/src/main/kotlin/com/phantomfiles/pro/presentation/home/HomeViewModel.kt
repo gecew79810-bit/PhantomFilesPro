@@ -11,6 +11,7 @@ import com.phantomfiles.pro.util.FormatUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -91,7 +92,8 @@ class HomeViewModel @Inject constructor(
                     scanStatusText = "",
                     scanResultText = "Smart Scan done: ${junk.size} junk, ${empty.size} empty folders, ${large.size} large files, ${dupes.size} duplicate groups"
                 )
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(isScanning = false, scanStatusText = "", scanResultText = "Scan failed - check storage permission")
             }
         }
@@ -137,7 +139,8 @@ class HomeViewModel @Inject constructor(
                     scanStatusText = "",
                     scanResultText = "Deep Scan done: ${junk.size} junk, ${disguised.size} disguised, ${oldApks.size} old APKs, ${dupes.size} duplicates, $hiddenCount hidden"
                 )
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(isScanning = false, scanStatusText = "", scanResultText = "Deep Scan failed - check permission")
             }
         }
@@ -178,7 +181,8 @@ class HomeViewModel @Inject constructor(
                     scanResultText = "Cleaned $cleaned/${all.size} items"
                 )
                 loadDashboard()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(isScanning = false, scanResultText = "Clean failed")
             }
         }

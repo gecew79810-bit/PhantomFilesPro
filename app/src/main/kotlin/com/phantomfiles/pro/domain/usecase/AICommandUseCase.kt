@@ -281,7 +281,7 @@ class AICommandUseCase @Inject constructor(
             }
             Intent.FIND_FILE_BY_NAME -> {
                 val query = cmd
-                    .replace(Regex("(find|dhundh|khoj|search|locate|where is|kahan|kaha|kar|karo|do|file|named|naam)"), "")
+                    .replace(Regex("\\b(find|dhundh|khoj|search|locate|where is|kahan|kaha|kar|karo|do|file|named|naam)\\b"), "")
                     .trim()
                     .ifEmpty { cmd }
                 if (query.length >= 2) {
