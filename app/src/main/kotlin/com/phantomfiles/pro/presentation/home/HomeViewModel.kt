@@ -12,10 +12,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
@@ -130,7 +132,7 @@ class HomeViewModel @Inject constructor(
                     duplicateSize = dupes.sumOf { it.totalWastedSize }
                 )
 
-                val hiddenCount = countHiddenFiles(root)
+                val hiddenCount = withContext(Dispatchers.IO) { countHiddenFiles(root) }
                 _state.value = _state.value.copy(hiddenCount = hiddenCount)
 
                 _state.value = _state.value.copy(
@@ -161,13 +163,15 @@ class HomeViewModel @Inject constructor(
                 val all = junk + empty
                 var cleaned = 0
                 all.forEachIndexed { idx, file ->
-                    try {
-                        val f = File(file.path)
-                        val deleted = if (f.exists()) {
-                            if (f.isDirectory) f.deleteRecursively() else f.delete()
-                        } else false
-                        if (deleted) cleaned++
-                    } catch (_: Exception) { }
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val f = File(file.path)
+                            val deleted = if (f.exists()) {
+                                if (f.isDirectory) f.deleteRecursively() else f.delete()
+                            } else false
+                            if (deleted) cleaned++
+                        } catch (_: Exception) { }
+                    }
                     _state.value = _state.value.copy(
                         scanProgress = 0.4f + (0.55f * (idx + 1) / all.size),
                         scanStatusText = "Cleaning ${idx + 1}/${all.size}..."

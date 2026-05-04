@@ -8,10 +8,12 @@ import com.phantomfiles.pro.data.repository.FileRepository
 import com.phantomfiles.pro.data.repository.ScanRepository
 import com.phantomfiles.pro.presentation.theme.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
@@ -87,14 +89,13 @@ class StorageAnalyzerViewModel @Inject constructor(
                 )
 
                 val topFolders = try {
-                    fileRepository.listFiles(root).first()
-                        .filter { it.isDirectory }
-                        .map { folder ->
+                    val dirs = fileRepository.listFiles(root).first().filter { it.isDirectory }
+                    withContext(Dispatchers.IO) {
+                        dirs.map { folder ->
                             val size = try { calculateFolderSize(File(folder.path)) } catch (_: Exception) { 0L }
                             folder.copy(size = size)
                         }
-                        .sortedByDescending { it.size }
-                        .take(10)
+                    }.sortedByDescending { it.size }.take(10)
                 } catch (_: Exception) { emptyList() }
 
                 _state.value = _state.value.copy(
@@ -163,19 +164,22 @@ class StorageAnalyzerViewModel @Inject constructor(
     fun cleanAll() {
         viewModelScope.launch {
             val toDelete = _state.value.residualFiles + _state.value.redundantFiles + _state.value.emptyFolders
-            toDelete.forEach { file ->
-                try {
-                    val f = File(file.path)
-                    if (f.exists()) { if (f.isDirectory) f.deleteRecursively() else f.delete() }
-                } catch (_: Exception) { }
-            }
-            val cacheDirs = listOf("cache", "Cache", ".cache", "code_cache")
-            _state.value.appCaches.forEach { (appItem, _) ->
-                cacheDirs.forEach { cName ->
+            val caches = _state.value.appCaches.toList()
+            withContext(Dispatchers.IO) {
+                toDelete.forEach { file ->
                     try {
-                        val cDir = File(appItem.path, cName)
-                        if (cDir.exists()) cDir.deleteRecursively()
+                        val f = File(file.path)
+                        if (f.exists()) { if (f.isDirectory) f.deleteRecursively() else f.delete() }
                     } catch (_: Exception) { }
+                }
+                val cacheDirs = listOf("cache", "Cache", ".cache", "code_cache")
+                caches.forEach { (appItem, _) ->
+                    cacheDirs.forEach { cName ->
+                        try {
+                            val cDir = File(appItem.path, cName)
+                            if (cDir.exists()) cDir.deleteRecursively()
+                        } catch (_: Exception) { }
+                    }
                 }
             }
             startAnalysis()
