@@ -25,7 +25,7 @@ data class GroqChoice(
 )
 
 interface GroqApi {
-    @POST("openai/v1/chat/completions")
+    @POST("chat/completions")
     suspend fun chat(
         @Header("Authorization") authorization: String,
         @Body request: GroqRequest

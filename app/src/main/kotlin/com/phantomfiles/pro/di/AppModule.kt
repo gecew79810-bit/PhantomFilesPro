@@ -55,7 +55,7 @@ object AppModule {
     @Singleton
     fun provideGroqApi(client: OkHttpClient): GroqApi =
         Retrofit.Builder()
-            .baseUrl("https://api.groq.com/")
+            .baseUrl("https://api.groq.com/openai/v1/")
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

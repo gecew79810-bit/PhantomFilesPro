@@ -305,13 +305,39 @@ class AICommandUseCase @Inject constructor(
                             request = GeminiRequest(
                                 contents = listOf(
                                     GeminiContent(parts = listOf(
-                                        GeminiPart("You are PhantomFiles AI, an Android file manager assistant. Help users manage files. Keep responses short (2-3 lines max), actionable, and in the same language the user uses. If Hindi/Hinglish, reply in Hinglish.\n\nUser: $command")
+                                        GeminiPart("""
+                                        You are PhantomFiles AI, an Android file manager assistant.
+                                        You can help users find, clean, and manage files.
+                                        
+                                        If the user wants to find a file, respond with a JSON block containing the search query:
+                                        { "action": "SEARCH", "query": "filename_to_search" }
+                                        
+                                        Otherwise, keep responses short (2-3 lines max), actionable, and in the same language the user uses.
+                                        If Hindi/Hinglish, reply in Hinglish.
+                                        
+                                        User: $command
+                                    """.trimIndent())
                                     ))
                                 )
                             )
                         )
                         val reply = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "No response from Gemini"
-                        emit(AIResponse(message = reply))
+                        
+                        if (reply.contains("\"action\": \"SEARCH\"")) {
+                            val searchQuery = Regex("\"query\":\\s*\"([^\"]+)\"").find(reply)?.groupValues?.get(1) ?: ""
+                            if (searchQuery.isNotBlank()) {
+                                val results = fileRepository.searchFiles(fileRepository.getRootPath(), searchQuery).first()
+                                emit(AIResponse(
+                                    message = if (results.isNotEmpty()) "Found ${results.size} files for \"$searchQuery\"" else "No files found for \"$searchQuery\"",
+                                    action = AIAction.SHOW_FILES,
+                                    files = results.sortedByDescending { it.lastModified }.take(100)
+                                ))
+                            } else {
+                                emit(AIResponse(message = reply))
+                            }
+                        } else {
+                            emit(AIResponse(message = reply))
+                        }
                     } catch (e: Exception) {
                         emit(AIResponse(message = "Gemini error: ${e.message}\n\nTry offline commands: 'cache clear karo', 'large files dikha'"))
                     }
@@ -321,13 +347,37 @@ class AICommandUseCase @Inject constructor(
                             authorization = "Bearer $groqKey",
                             request = GroqRequest(
                                 messages = listOf(
-                                    GroqMessage("system", "You are PhantomFiles AI, an Android file manager assistant. Help users manage files. Keep responses short (2-3 lines max), actionable, and in the same language the user uses. If they speak Hindi/Hinglish, reply in Hinglish."),
+                                    GroqMessage("system", """
+                                        You are PhantomFiles AI, an Android file manager assistant.
+                                        You can help users find, clean, and manage files.
+                                        
+                                        If the user wants to find a file, respond with a JSON block containing the search query:
+                                        { "action": "SEARCH", "query": "filename_to_search" }
+                                        
+                                        Otherwise, keep responses short (2-3 lines max), actionable, and in the same language the user uses.
+                                        If Hindi/Hinglish, reply in Hinglish.
+                                    """.trimIndent()),
                                     GroqMessage("user", command)
                                 )
                             )
                         )
                         val reply = response.choices?.firstOrNull()?.message?.content ?: "No response from AI"
-                        emit(AIResponse(message = reply))
+                        
+                        if (reply.contains("\"action\": \"SEARCH\"")) {
+                            val searchQuery = Regex("\"query\":\\s*\"([^\"]+)\"").find(reply)?.groupValues?.get(1) ?: ""
+                            if (searchQuery.isNotBlank()) {
+                                val results = fileRepository.searchFiles(fileRepository.getRootPath(), searchQuery).first()
+                                emit(AIResponse(
+                                    message = if (results.isNotEmpty()) "Found ${results.size} files for \"$searchQuery\"" else "No files found for \"$searchQuery\"",
+                                    action = AIAction.SHOW_FILES,
+                                    files = results.sortedByDescending { it.lastModified }.take(100)
+                                ))
+                            } else {
+                                emit(AIResponse(message = reply))
+                            }
+                        } else {
+                            emit(AIResponse(message = reply))
+                        }
                     } catch (e: Exception) {
                         emit(AIResponse(message = "API error: ${e.message}\n\nTry offline commands: 'cache clear karo', 'large files dikha'"))
                     }
