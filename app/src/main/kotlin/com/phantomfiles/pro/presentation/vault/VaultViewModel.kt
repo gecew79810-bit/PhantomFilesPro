@@ -33,6 +33,8 @@ class VaultViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<VaultUiState>(VaultUiState.Locked)
     val uiState: StateFlow<VaultUiState> = _uiState
 
+    val biometricEnabled = settingsRepository.biometricEnabled
+
     private var vaultPassword: String = ""
 
     private val encryptedPrefs by lazy {

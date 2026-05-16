@@ -94,9 +94,9 @@ fun HomeScreen(
     FuturisticDashboard(
         state = dashboardState,
         onSmartScan = { viewModel.smartScan() },
-        onDeepScan = { viewModel.deepScan() },
+        onDeepScan = onNavigateToScanner,
         onCleanAll = { viewModel.cleanAll() },
-        onAutoFix = onNavigateToAI,
+        onAutoFix = { onNavigateToAI() },
         onUnlock = onNavigateToVault,
         onPickFolder = { onNavigateToFolder("/storage/emulated/0", "Internal Storage") },
         onPause = { },

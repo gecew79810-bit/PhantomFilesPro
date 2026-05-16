@@ -298,43 +298,38 @@ private fun HeroRow(
     aiOnline: Boolean
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxWidth().height(160.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        GlassCard(modifier = Modifier.weight(1f)) {
-            Text("STORAGE", color = PfTextDim, fontSize = 12.sp, letterSpacing = 1.sp)
-            Spacer(Modifier.height(10.dp))
+        GlassCard(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            Text("STORAGE", color = PfTextDim, fontSize = 10.sp, letterSpacing = 1.sp)
             Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 RingProgress(used = storageUsedPercent)
             }
-            Spacer(Modifier.height(8.dp))
-            Text("$usedStorageText Used", color = PfText, fontSize = 13.sp)
-            Text("$freeStorageText Free", color = PfGreen, fontSize = 13.sp)
+            Text("$usedStorageText Used", color = PfText, fontSize = 11.sp)
+            Text("$freeStorageText Free", color = PfGreen, fontSize = 11.sp)
         }
 
-        GlassCard(modifier = Modifier.weight(1.2f)) {
+        GlassCard(modifier = Modifier.weight(1.2f).fillMaxHeight()) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(196.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 AiOrb(glow = glow, aiOnline = aiOnline)
             }
         }
 
-        GlassCard(modifier = Modifier.weight(1f)) {
-            Text("SYSTEM HEALTH", color = PfTextDim, fontSize = 12.sp, letterSpacing = 1.sp)
-            Spacer(Modifier.height(10.dp))
-            Text(systemHealthText, color = PfGreen, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            HeartLine()
-            Spacer(Modifier.height(12.dp))
-            Text(systemNote1, color = PfTextDim, fontSize = 13.sp)
-            Text(systemNote2, color = PfGreen, fontSize = 13.sp)
+        GlassCard(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            Text("HEALTH", color = PfTextDim, fontSize = 10.sp, letterSpacing = 1.sp)
+            Text(systemHealthText, color = PfGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                HeartLine()
+            }
+            Text(systemNote1, color = PfTextDim, fontSize = 11.sp, maxLines = 1)
+            Text(systemNote2, color = PfGreen, fontSize = 11.sp, maxLines = 1)
         }
     }
 }

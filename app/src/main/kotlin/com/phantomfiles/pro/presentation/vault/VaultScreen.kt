@@ -181,13 +181,14 @@ private fun LockScreen(
     val context = LocalContext.current
     val activity = context as? FragmentActivity
 
+    val biometricEnabled by viewModel.biometricEnabled.collectAsStateWithLifecycle(initialValue = false)
     val biometricAvailable = remember {
         val mgr = BiometricManager.from(context)
         mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
     }
 
-    LaunchedEffect(biometricAvailable) {
-        if (biometricAvailable && activity != null) {
+    LaunchedEffect(biometricAvailable, biometricEnabled) {
+        if (biometricAvailable && biometricEnabled && activity != null) {
             showBiometricPrompt(activity, onBiometricSuccess)
         }
     }
@@ -228,7 +229,7 @@ private fun LockScreen(
             ) {
                 Text("Unlock")
             }
-            if (biometricAvailable) {
+            if (biometricAvailable && biometricEnabled) {
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedButton(
                     onClick = {
